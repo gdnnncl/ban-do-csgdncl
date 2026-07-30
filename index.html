@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bản đồ các cơ sở giáo dục ngoài công lập — Sở GD&ĐT TP.HCM</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#0F1B2A;
+    --paper:#F6F7F5;
+    --panel:#FFFFFF;
+    --line:#DDE3E0;
+    --accent:#0F6E5C;
+    --accent-dim:#0F6E5C22;
+    --muted:#5B6B66;
+    --st-hoat-dong:#1E8F5F;
+    --st-ngung:#D97706;
+    --st-giai-the:#C0392B;
+    --st-thanh-lap:#2563EB;
+    --st-het-han:#6B21A8;
+    --st-chua-xd:#8A8F8C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--paper);color:var(--ink);}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  header{
+    padding:14px 20px;
+    background:var(--ink);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    border-bottom:3px solid var(--accent);
+  }
+  header .title{display:flex;flex-direction:column;gap:2px;}
+  header .title h1{font-size:16px;margin:0;font-weight:700;letter-spacing:0.2px;}
+  header .title p{font-size:12px;margin:0;color:#B9C3C0;font-weight:400;}
+  header .stats{display:flex;gap:18px;flex-wrap:wrap;}
+  .stat{text-align:right;}
+  .stat .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .stat .l{font-size:10.5px;color:#B9C3C0;text-transform:uppercase;letter-spacing:0.4px;}
+
+  #main{flex:1;display:flex;min-height:0;}
+
+  #sidebar{
+    width:300px;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    padding:16px;
+    overflow-y:auto;
+    flex-shrink:0;
+  }
+  #sidebar h2{font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin:0 0 10px 0;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .toggle-all{font-size:10px;text-transform:none;letter-spacing:0;color:var(--accent);cursor:pointer;text-decoration:underline;font-weight:600;white-space:nowrap;}
+  .scroll-filter{max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;padding:4px;}
+
+  .layer-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+  .layer-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);font-weight:700;user-select:none;}
+  .layer-toggle input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;flex-shrink:0;}
+  .priority-badge{font-size:9px;background:var(--accent-dim);color:var(--accent);padding:1px 6px;border-radius:8px;font-weight:700;text-transform:none;letter-spacing:0;}
+
+  .legend-box{
+    position:absolute;left:12px;bottom:24px;z-index:1000;
+    background:#fff;border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;min-width:180px;max-width:250px;max-height:240px;overflow-y:auto;
+    box-shadow:0 2px 10px rgba(0,0,0,0.18);font-size:12px;
+  }
+  .legend-title{font-weight:700;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .legend-sub{color:var(--muted);font-size:11px;}
+  .legend-row{display:flex;align-items:center;gap:7px;padding:2px 0;}
+  .legend-row .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .legend-count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px;}
+  .filter-group{margin-bottom:20px;}
+  .filter-row{
+    display:flex;align-items:center;gap:8px;
+    padding:6px 8px;border-radius:6px;cursor:pointer;
+    font-size:13px;user-select:none;
+  }
+  .filter-row:hover{background:#F0F2F1;}
+  .filter-row input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .filter-row .count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;}
+
+  #fileInput{
+    width:100%;font-size:12px;margin-bottom:8px;padding:6px;
+    border:1px dashed var(--line);border-radius:6px;background:#F0F2F1;
+  }
+
+  #search{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;
+    font-size:13px;margin-bottom:16px;font-family:inherit;
+  }
+  #search:focus{outline:2px solid var(--accent-dim);border-color:var(--accent);}
+
+  .legend-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:10px;background:#F0F2F1;border-radius:6px;margin-top:6px;}
+
+  #mapWrap{flex:1;position:relative;}
+  #map{width:100%;height:100%;}
+
+  .loading-overlay{
+    position:absolute;inset:0;z-index:2000;
+    background:rgba(246,247,245,0.92);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:12px;font-size:13px;color:var(--muted);font-weight:600;
+  }
+  .loading-spinner{
+    width:32px;height:32px;border-radius:50%;
+    border:3px solid var(--line);border-top-color:var(--accent);
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .leaflet-popup-content-wrapper{border-radius:8px;}
+  .popup h3{margin:0 0 6px 0;font-size:13.5px;line-height:1.3;}
+  .popup .row{font-size:12px;margin:3px 0;color:#333;}
+  .popup .row b{color:#000;}
+  .badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;color:#fff;}
+
+  .report-group{margin-top:10px;padding-top:8px;border-top:1px solid #eee;}
+  .report-label{font-size:11px;color:#666;margin-bottom:6px;font-weight:600;}
+  .report-btn,
+  .leaflet-popup-content a.report-btn{
+    display:block;margin-top:6px;padding:7px 9px;text-align:center;
+    background:var(--accent);color:#fff !important;border-radius:6px;font-size:11.5px;font-weight:600;
+    text-decoration:none;
+  }
+  .report-btn:hover{background:#0c5a4a;}
+  .report-btn-alt{background:#2563EB;}
+  .report-btn-alt:hover{background:#1d4ed8;}
+  .report-btn-alt2{background:#7C3AED;}
+  .report-btn-alt2:hover{background:#6d28d9;}
+
+  #sidebarToggle{
+    display:none;position:absolute;left:12px;z-index:1600;
+    align-items:center;gap:6px;padding:9px 14px;border-radius:20px;border:none;
+    background:var(--ink);color:#fff;font-size:13px;font-weight:600;cursor:pointer;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25);
+  }
+  #sidebarToggle .toggle-icon{font-size:15px;}
+  #sidebarClose{
+    display:none;width:100%;padding:10px;margin-bottom:14px;border:1px solid var(--line);
+    border-radius:8px;background:var(--paper);color:var(--ink);font-size:13px;font-weight:600;
+    cursor:pointer;
+  }
+  #sidebarBackdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1400;
+  }
+  #sidebarBackdrop.show{display:block;}
+
+  footer{
+    padding:6px 20px;font-size:11px;color:var(--muted);background:var(--panel);
+    border-top:1px solid var(--line);
+  }
+
+  /* ============ TABLET (≤900px): thanh bên biến thành panel trượt ============ */
+  @media (max-width:900px){
+    #sidebarToggle{display:flex;bottom:280px;} /* nổi phía TRÊN hộp chú thích màu (legend), góc trái dưới */
+    #sidebarClose{display:block;}
+
+    #sidebar{
+      position:fixed;top:0;left:0;height:100%;width:82%;max-width:340px;
+      transform:translateX(-100%);transition:transform .25s ease;z-index:1500;
+      box-shadow:2px 0 16px rgba(0,0,0,0.25);
+    }
+    #sidebar.open{transform:translateX(0);}
+
+    /* Popup không vượt quá chiều rộng màn hình */
+    .leaflet-popup-content-wrapper{max-width:min(88vw,340px);}
+  }
+
+  /* ============ ĐIỆN THOẠI (≤600px): thu gọn thêm phần đầu trang, legend, chữ ============ */
+  @media (max-width:600px){
+    header{padding:10px 12px;gap:8px;}
+    header .title h1{font-size:13.5px;}
+    header .title p{display:none;} /* phụ đề dài, ẩn trên màn hình rất nhỏ để đỡ rối */
+    header .stats{gap:12px;}
+    .stat .n{font-size:15px;}
+    .stat .l{font-size:9px;}
+
+    #sidebarToggle{left:8px;bottom:180px;padding:8px 12px;font-size:12px;} /* legend thấp hơn trên điện thoại -> nút cũng hạ theo */
+
+    .legend-box{
+      left:8px;right:8px;bottom:12px;max-width:none;min-width:0;
+      max-height:150px;
+    }
+
+    footer{font-size:9.5px;padding:5px 12px;line-height:1.4;}
+
+    /* Vùng bấm rộng hơn cho tay chạm — nút chọn tất cả, checkbox, nút phản ánh */
+    .toggle-all{padding:4px 2px;}
+    .filter-row{padding:8px 6px;}
+    .filter-row input,.layer-toggle input{width:18px;height:18px;}
+    .report-btn{padding:10px 9px;font-size:12.5px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <button id="sidebarToggle" aria-label="Mở bộ lọc" title="Bộ lọc">
+    <span class="toggle-icon">☰</span><span class="toggle-text">Bộ lọc</span>
+  </button>
+  <div id="sidebarBackdrop"></div>
+  <header>
+    <div class="title">
+      <h1>🗺️ Bản đồ các cơ sở giáo dục ngoài công lập</h1>
+      <p>Thuộc Sở Giáo dục và Đào tạo Thành phố Hồ Chí Minh</p>
+    </div>
+    <div class="stats" id="statsBar"></div>
+  </header>
+  <div id="main">
+    <div id="sidebar">
+      <button id="sidebarClose" aria-label="Đóng bộ lọc">✕ Đóng</button>
+
+      <div class="filter-group" id="uploadSection" style="display:none;">
+        <h2>📂 Bổ sung dữ liệu từ file khác</h2>
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+        <div class="legend-note" id="uploadStatus">
+          Chọn file Excel đã làm sạch (có cột "Mã trung tâm", "Vỹ độ_chuẩn"...) — hệ thống tự quét
+          MỌI sheet phù hợp trong file và gộp thêm vào bản đồ hiện tại. Cơ sở trùng "Mã trung tâm"
+          sẽ được CẬP NHẬT theo dữ liệu mới nhất, không tạo trùng lặp. Xử lý hoàn toàn trên trình
+          duyệt của bạn — file không được gửi lên bất kỳ máy chủ nào.
+        </div>
+      </div>
+
+      <input type="text" id="search" placeholder="Đang tải dữ liệu..." disabled>
+
+      <div class="filter-group">
+        <div class="layer-header">
+          <label class="layer-toggle">
+            <input type="checkbox" checked id="layerToggle-type">
+            Loại trung tâm <span class="priority-badge">Ưu tiên 1</span>
+          </label>
+          <a href="#" id="typeToggleAll" class="toggle-all">chọn tất cả / bỏ chọn</a>
+        </div>
+        <div id="typeFilters"></div>
+      </div>
+
+      <div class="filter-group">
+        <div class="layer-header">
+          <label class="layer-toggle">
+            <input type="checkbox" checked id="layerToggle-ward">
+            Phường/Xã <span class="priority-badge">Ưu tiên 2</span>
+          </label>
+          <a href="#" id="wardToggleAll" class="toggle-all">chọn tất cả / bỏ chọn</a>
+        </div>
+        <div id="wardFilters" class="scroll-filter"></div>
+      </div>
+
+      <div class="filter-group">
+        <div class="layer-header">
+          <label class="layer-toggle">
+            <input type="checkbox" checked id="layerToggle-status">
+            Trạng thái hoạt động <span class="priority-badge">Ưu tiên 3</span>
+          </label>
+          <a href="#" id="statusToggleAll" class="toggle-all">chọn tất cả / bỏ chọn</a>
+        </div>
+        <div id="statusFilters"></div>
+      </div>
+
+      <div class="filter-group">
+        <div class="layer-header">
+          <label class="layer-toggle">
+            <input type="checkbox" checked id="layerToggle-confidence">
+            Độ tin cậy tọa độ <span class="priority-badge">Ưu tiên 4</span>
+          </label>
+          <a href="#" id="confToggleAll" class="toggle-all">chọn tất cả / bỏ chọn</a>
+        </div>
+        <div id="confidenceFilters"></div>
+        <div class="legend-note">
+          <b>Cao</b>: đã đối chiếu 2 nguồn khớp nhau.<br>
+          <b>Trung bình</b>: geocode Google, cần xác minh.<br>
+          <b>Thấp</b>: geocode OSM/Photon theo tên, rủi ro nhầm chi nhánh — ưu tiên rà soát trước khi dùng chính thức.
+        </div>
+      </div>
+
+      <div class="legend-note" id="missingNote"></div>
+
+      <div class="filter-group">
+        <h2>Không thấy cơ sở bạn cần?</h2>
+        <div id="generalReportContainer"></div>
+      </div>
+    </div>
+    <div id="mapWrap">
+      <div id="map"></div>
+      <div id="legendBox" class="legend-box"></div>
+      <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div>Đang tải dữ liệu bản đồ...</div>
+      </div>
+    </div>
+  </div>
+  <footer>
+    Dữ liệu đã qua xử lý làm sạch · Chỉ hiển thị các cơ sở đã có tọa độ (xem ghi chú số liệu thiếu ở góc trái) · Nền bản đồ: CARTO / OpenStreetMap
+  </footer>
+</div>
+
+<script>
+// KHÔNG còn dữ liệu nhúng cứng trong mã nguồn — trang khởi động HOÀN TOÀN RỖNG, chỉ có dữ liệu sau
+// khi trình duyệt tự gọi tới DATA_SOURCE_URL (xem bên dưới) lúc mở trang. Xem "View Page Source"
+// hoặc mã nguồn trên GitHub sẽ KHÔNG thấy bất kỳ thông tin đơn vị nào được nhúng sẵn ở đây.
+let DATA = [];
+
+const STATUS_COLOR = {
+  "Hoạt động": "#1E8F5F",
+  "Ngưng hoạt động": "#D97706",
+  "Giải thể": "#C0392B",
+  "Thành lập": "#2563EB",
+  "Hết hạn": "#6B21A8",
+  "Chưa xác định": "#8A8F8C"
+};
+const STATUS_ORDER = ["Hoạt động","Ngưng hoạt động","Giải thể","Thành lập","Hết hạn","Chưa xác định"];
+const CONF_COLOR = { "Cao": "#1E8F5F", "Trung bình": "#D97706", "Thấp": "#C0392B" };
+const CONF_ORDER = ["Cao","Trung bình","Thấp"];
+
+// Loại trung tâm và Phường/Xã không cố định trước — tính động từ dữ liệu thực tế, sắp xếp theo
+// số lượng cơ sở giảm dần (loại/phường phổ biến nhất lên đầu danh sách cho dễ dùng).
+function distinctSorted(field){
+  const counts = {};
+  DATA.forEach(d => {
+    const v = (d[field] || '').trim() || 'Chưa phân loại';
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  return Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+}
+const TYPE_ORDER = distinctSorted('type');
+const WARD_ORDER = distinctSorted('ward');
+
+/** Sinh bảng màu phân loại tự động (xoay vòng hue) cho các lớp không có màu cố định sẵn (Loại/Phường) */
+function buildAutoColors(order){
+  const map = {};
+  order.forEach((val, i) => {
+    const hue = Math.round((360 / order.length) * i);
+    map[val] = 'hsl(' + hue + ',62%,45%)';
+  });
+  return map;
+}
+
+// Thứ tự ƯU TIÊN tô màu bản đồ: lớp nào đứng trước trong mảng này mà đang BẬT (layerEnabled)
+// thì bản đồ tô theo lớp đó và hộp chú thích hiển thị đúng lớp đó.
+const PRIORITY = ['type', 'ward', 'status', 'confidence'];
+const LAYER_META = {
+  type:       { label: 'Loại trung tâm',        field: 'type',       order: TYPE_ORDER,   colors: buildAutoColors(TYPE_ORDER) },
+  ward:       { label: 'Phường/Xã',              field: 'ward',       order: WARD_ORDER,   colors: buildAutoColors(WARD_ORDER) },
+  status:     { label: 'Trạng thái hoạt động',   field: 'status',     order: STATUS_ORDER, colors: STATUS_COLOR },
+  confidence: { label: 'Độ tin cậy tọa độ',      field: 'confidence', order: CONF_ORDER,   colors: CONF_COLOR },
+};
+const layerEnabled = { type: true, ward: true, status: true, confidence: true };
+
+function getActiveColorLayer(){
+  for (const key of PRIORITY) if (layerEnabled[key]) return key;
+  return null; // không lớp nào bật -> không tô màu theo thuộc tính nào (dùng màu trung tính)
+}
+
+/** Tính lại TYPE_ORDER/WARD_ORDER/STATUS_ORDER/CONF_ORDER + màu sắc sau khi có dữ liệu mới được
+ *  gộp vào DATA (từ chức năng tải thêm file). MUTATE TRỰC TIẾP các mảng/Set hiện có (không gán lại
+ *  bằng "="), để mọi closure đã lưu tham chiếu tới các mảng này (vd trong wireToggleAll) vẫn thấy
+ *  đúng dữ liệu mới nhất mà không cần nối dây lại sự kiện. Giá trị phân loại MỚI xuất hiện sẽ mặc
+ *  định được bật hiển thị; các lựa chọn ẩn/hiện mà người dùng đã chọn trước đó cho các giá trị cũ
+ *  được giữ nguyên. */
+function rebuildDerivedState(){
+  const newTypeOrder = distinctSorted('type');
+  const newWardOrder = distinctSorted('ward');
+
+  // Thêm các giá trị MỚI vào Set đang bật (giữ nguyên lựa chọn cũ cho giá trị đã có)
+  newTypeOrder.forEach(v => { if (!TYPE_ORDER.includes(v)) activeType.add(v); });
+  newWardOrder.forEach(v => { if (!WARD_ORDER.includes(v)) activeWard.add(v); });
+
+  // QUAN TRỌNG: dọn sạch khỏi Set đang bật các giá trị KHÔNG CÒN tồn tại trong dữ liệu mới. Nếu bỏ
+  // qua bước này, activeX.size sẽ bị "phình to" hơn số lượng mục thực tế đang hiển thị (còn sót giá
+  // trị cũ từ dữ liệu nhúng sẵn ban đầu, trước khi tải dữ liệu trực tiếp) — khiến nút "chọn tất cả/
+  // bỏ chọn" tính sai trạng thái allChecked, luôn tưởng "chưa chọn hết" nên cố chọn thêm cái đã chọn
+  // sẵn, nhìn như không có tác dụng gì khi bấm.
+  Array.from(activeType).forEach(v => { if (newTypeOrder.indexOf(v) === -1) activeType.delete(v); });
+  Array.from(activeWard).forEach(v => { if (newWardOrder.indexOf(v) === -1) activeWard.delete(v); });
+
+  TYPE_ORDER.length = 0; newTypeOrder.forEach(v => TYPE_ORDER.push(v));
+  WARD_ORDER.length = 0; newWardOrder.forEach(v => WARD_ORDER.push(v));
+
+  LAYER_META.type.colors = buildAutoColors(TYPE_ORDER);
+  LAYER_META.ward.colors = buildAutoColors(WARD_ORDER);
+
+  // Trạng thái/Độ tin cậy về nguyên tắc là danh mục cố định, nhưng phòng hờ dữ liệu mới có giá trị lạ
+  DATA.forEach(d => {
+    if (d.status && !STATUS_ORDER.includes(d.status)) {
+      STATUS_ORDER.push(d.status);
+      activeStatus.add(d.status);
+      if (!STATUS_COLOR[d.status]) STATUS_COLOR[d.status] = '#8A8F8C';
+    }
+    if (d.confidence && !CONF_ORDER.includes(d.confidence)) {
+      CONF_ORDER.push(d.confidence);
+      activeConf.add(d.confidence);
+      if (!CONF_COLOR[d.confidence]) CONF_COLOR[d.confidence] = '#8A8F8C';
+    }
+  });
+}
+
+// ---- Khởi tạo bản đồ ----
+// Dùng nền CartoDB Positron (tối giản, không hiển thị ký hiệu nhà hàng/khách sạn/siêu thị/quán ăn...
+// như nền OpenStreetMap chuẩn) — chỉ còn đường sá, tên khu vực, phù hợp để nhấn mạnh dữ liệu cơ sở
+// giáo dục do Sở quản lý, không bị lẫn với các điểm dịch vụ thương mại không liên quan.
+const map = L.map('map', { zoomControl: true }).setView([10.78, 106.68], 11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+}).addTo(map);
+
+// Mặc định KHÔNG hiển thị 3 trạng thái này khi bản đồ mới mở — người xem có thể tự bật lại ở thanh bên
+const DEFAULT_HIDDEN_STATUS = ["Ngưng hoạt động", "Giải thể", "Hết hạn"];
+const activeStatus = new Set(STATUS_ORDER.filter(s => !DEFAULT_HIDDEN_STATUS.includes(s)));
+const activeConf = new Set(CONF_ORDER);
+const activeType = new Set(TYPE_ORDER);
+const activeWard = new Set(WARD_ORDER);
+let searchTerm = "";
+let markers = [];
+
+function normalize(s){ return (s||'').toString().toLowerCase(); }
+
+/** Bộ nhớ đệm trong phiên làm việc — nếu bấm lại đúng 1 điểm đã xem, không cần gọi lại máy chủ */
+const detailCache = {};
+
+/** Sinh HTML popup theo 2 giai đoạn:
+ *  - detail = null: chỉ hiện các trường KHÔNG nhạy cảm đã có sẵn (tên, loại, trạng thái...), kèm
+ *    dòng "Đang tải..." — dùng ngay lúc marker vừa được tạo, KHÔNG gọi máy chủ.
+ *  - detail = object: hiện đầy đủ (địa chỉ, SĐT, Website, Place ID, nút phản ánh) — chỉ có SAU KHI
+ *    người dùng bấm vào marker và tải xong dữ liệu chi tiết riêng cho đúng 1 cơ sở đó. */
+function buildPopupHtml(d, detail) {
+  const statusColor = STATUS_COLOR[d.status] || STATUS_COLOR["Chưa xác định"];
+  const confColor = CONF_COLOR[d.confidence] || "#999";
+  const base =
+    '<div class="popup">' +
+    '<h3>' + escapeHtml(d.name) + '</h3>' +
+    '<div class="row"><b>Mã:</b> ' + escapeHtml(d.id) + '</div>' +
+    '<div class="row"><b>Loại hình:</b> ' + escapeHtml(d.type) + '</div>' +
+    '<div class="row"><b>Trạng thái:</b> <span class="badge" style="background:' + statusColor + '">' + escapeHtml(d.status) + '</span></div>' +
+    '<div class="row"><b>Độ tin cậy tọa độ:</b> <span class="badge" style="background:' + confColor + '">' + escapeHtml(d.confidence) + '</span></div>' +
+    '<div class="row"><b>Phường/Xã:</b> ' + escapeHtml(d.ward) + '</div>';
+
+  if (!detail) {
+    return base + '<div class="row" style="color:var(--muted)">⏳ Đang tải địa chỉ, liên hệ...</div></div>';
+  }
+  if (!detail.address && !detail.phone && !detail.website) {
+    // fetchDetail thất bại (mất mạng, chưa cấu hình DATA_SOURCE_URL...) hoặc không tìm thấy bản ghi
+    return base + '<div class="row" style="color:#C0392B">⚠️ Không tải được thông tin chi tiết. Thử bấm lại.</div></div>';
+  }
+
+  const mapLink = buildMapRefLink(detail.mapRef);
+  const merged = Object.assign({}, d, detail); // gộp để reportButtonHtml có đủ address cho link prefill
+
+  return base +
+    '<div class="row"><b>Địa chỉ:</b> ' + escapeHtml(detail.address) + '</div>' +
+    (detail.phone ? '<div class="row"><b>ĐT:</b> ' + escapeHtml(detail.phone) + '</div>' : '') +
+    (detail.website
+      ? '<div class="row"><b>Website:</b> <a href="' + normalizeWebsiteUrl(detail.website)
+        + '" target="_blank" rel="noopener">' + escapeHtml(detail.website) + '</a></div>'
+      : '<div class="row"><b>Website:</b> <span style="color:var(--muted)">Chưa xây dựng</span></div>') +
+    (mapLink
+      ? '<div class="row"><a href="' + mapLink
+        + '" target="_blank" rel="noopener">📍 Xem trên Google Maps (kiểm tra tình hình hoạt động)</a></div>'
+      : '<div class="row"><b>Place ID:</b> <span style="color:var(--muted)">Chưa có Place ID trên Google Maps</span></div>') +
+    '<div class="report-group">' +
+    '<div class="report-label">📢 Bạn muốn phản ánh / cập nhật với vai trò nào?</div>' +
+    reportButtonHtml('nguoidan', '🙋 Người dân — báo sai lệch/ngừng hoạt động', '', merged) +
+    reportButtonHtml('chucoso', '🏢 Chủ cơ sở — xác nhận/cập nhật thông tin', 'report-btn-alt', merged) +
+    reportButtonHtml('canbo', '👮 Cán bộ P/X — xác nhận kiểm tra thực địa', 'report-btn-alt2', merged) +
+    '</div>' +
+    '</div>';
+}
+
+/** Gọi riêng máy chủ để lấy CHI TIẾT của ĐÚNG 1 cơ sở (địa chỉ/SĐT/Website/Place ID) — không bao
+ *  giờ tải hàng loạt. Chỉ hoạt động khi đã cấu hình DATA_SOURCE_URL (Web App). */
+async function fetchDetail(id) {
+  if (!DATA_SOURCE_URL || DATA_SOURCE_URL.indexOf("CHUA_CAU_HINH") === 0) return null;
+  try {
+    const sep = DATA_SOURCE_URL.indexOf('?') === -1 ? '?' : '&';
+    const url = DATA_SOURCE_URL + sep + 'id=' + encodeURIComponent(id) + '&_t=' + Date.now();
+    const resp = await fetch(url, { cache: 'no-store' });
+    const json = await resp.json();
+    return json || null;
+  } catch (err) {
+    console.error('Không tải được chi tiết cho', id, err);
+    return null;
+  }
+}
+
+function buildMarkers(){
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  let shown = 0;
+  const activeLayer = getActiveColorLayer();
+  const tallies = {};
+
+  DATA.forEach(d => {
+    const typeVal = (d.type || '').trim() || 'Chưa phân loại';
+    const wardVal = (d.ward || '').trim() || 'Chưa phân loại';
+    if (!activeStatus.has(d.status) || !activeConf.has(d.confidence)) return;
+    if (!activeType.has(typeVal) || !activeWard.has(wardVal)) return;
+    if (searchTerm && normalize(d.name).indexOf(searchTerm) === -1) return;
+
+    let color = '#8A8F8C'; // màu trung tính khi không có lớp nào đang bật
+    if (activeLayer) {
+      const meta = LAYER_META[activeLayer];
+      const val = meta.field === 'type' ? typeVal : (meta.field === 'ward' ? wardVal : d[meta.field]);
+      color = meta.colors[val] || '#8A8F8C';
+      tallies[val] = (tallies[val] || 0) + 1;
+    }
+
+    const marker = L.circleMarker([d.lat, d.lng], {
+      radius: 5.5,
+      color: "#fff",
+      weight: 1,
+      fillColor: color,
+      fillOpacity: 0.9
+    });
+    marker.bindPopup(buildPopupHtml(d, null),
+      { maxWidth: Math.min(window.innerWidth - 40, 320), autoPanPadding: [16, 60] });
+
+    // Chỉ gọi tải thông tin chi tiết (địa chỉ/SĐT/Website/Place ID) khi người dùng THỰC SỰ bấm vào
+    // đúng điểm này — không tải sẵn cho toàn bộ 1 lúc, tránh lộ thông tin liên hệ hàng loạt.
+    marker.on('click', async function () {
+      if (detailCache[d.id]) {
+        marker.setPopupContent(buildPopupHtml(d, detailCache[d.id]));
+        return;
+      }
+      const detail = await fetchDetail(d.id);
+      if (detail) detailCache[d.id] = detail;
+      marker.setPopupContent(buildPopupHtml(d, detail || {}));
+    });
+
+    marker.addTo(map);
+    markers.push(marker);
+    shown++;
+  });
+  const shownCountEl = document.getElementById('shownCount');
+  if (shownCountEl) shownCountEl.textContent = shown.toLocaleString('vi-VN');
+  renderLegend(activeLayer, tallies);
+}
+
+/** Vẽ hộp chú thích màu nổi trên bản đồ, ứng với lớp đang được ưu tiên tô màu */
+function renderLegend(activeLayer, tallies){
+  const box = document.getElementById('legendBox');
+  if (!activeLayer) {
+    box.innerHTML = '<div class="legend-title">⚪ Không có lớp nào đang tô màu</div>'
+      + '<div class="legend-sub">Bật ít nhất 1 công tắc lớp ở thanh bên trái</div>';
+    return;
+  }
+  const meta = LAYER_META[activeLayer];
+  const rows = meta.order
+    .map(val => ({ val: val, cnt: tallies[val] || 0, color: meta.colors[val] || '#999' }))
+    .filter(r => r.cnt > 0)
+    .sort((a, b) => b.cnt - a.cnt)
+    .map(r =>
+      '<div class="legend-row"><span class="dot" style="background:' + r.color + '"></span>'
+      + escapeHtml(r.val) + '<span class="legend-count">' + r.cnt.toLocaleString('vi-VN') + '</span></div>'
+    ).join('');
+  box.innerHTML = '<div class="legend-title">🎨 ' + escapeHtml(meta.label) + '</div>'
+    + (rows || '<div class="legend-sub">Không có cơ sở nào đang hiển thị</div>');
+}
+
+/** Tạo link Google Maps từ giá trị cột "Địa chỉ MAP/Place ID" — giá trị này trong dữ liệu gốc có
+ *  thể là 1 URL đầy đủ (link rút gọn goo.gl, link Google Maps thường...) HOẶC 1 Place ID thô (dạng
+ *  "ChIJ..."). Tự nhận diện để luôn ra được 1 link bấm được, không cần chuẩn hoá dữ liệu nguồn. */
+function buildMapRefLink(mapRef) {
+  const v = (mapRef || '').trim();
+  if (!v) return null;
+  if (v.indexOf('http') === 0) return v; // đã là URL đầy đủ, dùng thẳng
+  if (/^ChIJ[A-Za-z0-9_-]+$/.test(v)) { // trông giống Place ID chuẩn của Google
+    return 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(v);
+  }
+  return null; // định dạng lạ, không đủ tin cậy để tạo link
+}
+
+/** Chuẩn hóa link website — nhiều dữ liệu gốc ghi kiểu "www.abc.com" hoặc "abc.com" (thiếu http://),
+ *  trình duyệt sẽ hiểu nhầm thành đường dẫn tương đối nếu dùng thẳng làm href, cần thêm tiền tố. */
+function normalizeWebsiteUrl(website) {
+  const v = (website || '').trim();
+  if (!v) return '#';
+  return /^https?:\/\//i.test(v) ? v : 'https://' + v;
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============================================================================
+// CẤU HÌNH CỔNG PHẢN ÁNH — dán URL MẪU (prefill) cho TỪNG VAI TRÒ, lấy được sau khi chạy
+// "15. Tạo 3 Google Form phản ánh" trong Apps Script (file PhanAnh.gs). Mỗi URL mẫu có dạng:
+//   https://docs.google.com/forms/d/e/XXXX/viewform?usp=pp_url&entry.111=__MA__&entry.222=__TEN__&entry.333=__DIACHI__
+// Giữ nguyên 3 placeholder __MA__ / __TEN__ / __DIACHI__ — script bên dưới tự thay bằng giá trị
+// thật của từng cơ sở khi người dùng bấm nút tương ứng trên bản đồ.
+// ============================================================================
+const REPORT_FORM_TEMPLATES = {
+  nguoidan:  "CHUA_CAU_HINH__DAN_URL_MAU_NGUOI_DAN_VAO_DAY",
+  chucoso:   "CHUA_CAU_HINH__DAN_URL_MAU_CHU_CO_SO_VAO_DAY",
+  canbo:     "CHUA_CAU_HINH__DAN_URL_MAU_CAN_BO_PX_VAO_DAY",
+};
+
+function buildReportUrl(role, d) {
+  const tpl = REPORT_FORM_TEMPLATES[role];
+  if (!tpl || tpl.indexOf("CHUA_CAU_HINH") === 0) return "#";
+  return tpl
+    .replace("__MA__", encodeURIComponent(d.id))
+    .replace("__TEN__", encodeURIComponent(d.name))
+    .replace("__DIACHI__", encodeURIComponent(d.address));
+}
+
+/** Sinh HTML cho 1 nút phản ánh. Nếu URL mẫu CHƯA được cấu hình, bấm vào sẽ hiện cảnh báo rõ ràng
+ *  thay vì im lặng không phản hồi (giúp tự chẩn đoán nguyên nhân "chưa cấu hình" so với "cấu hình sai"). */
+function reportButtonHtml(role, label, extraClass, d) {
+  const tpl = REPORT_FORM_TEMPLATES[role];
+  const configured = tpl && tpl.indexOf("CHUA_CAU_HINH") !== 0;
+  if (configured) {
+    return '<a class="report-btn ' + extraClass + '" href="' + buildReportUrl(role, d)
+      + '" target="_blank" rel="noopener">' + label + '</a>';
+  }
+  return '<a class="report-btn ' + extraClass + '" href="javascript:void(0)" '
+    + 'onclick="alert(\'Form cho vai trò này CHƯA ĐƯỢC CẤU HÌNH.\\n\\nNgười quản trị bản đồ cần: '
+    + '1) Chạy menu Apps Script \\\'15. Tạo 3 Google Form theo vai trò\\\'. '
+    + '2) Copy URL mẫu (prefill) tương ứng. '
+    + '3) Dán vào biến REPORT_FORM_TEMPLATES trong file HTML bản đồ này, tải bản đồ mới lên nơi chia sẻ.\')">'
+    + label + ' ⚠️</a>';
+}
+
+// ---- Sidebar: bộ lọc trạng thái ----
+function countBy(field, value){ return DATA.filter(d => d[field] === value).length; }
+function countByFallback(field, value){
+  return DATA.filter(d => ((d[field] || '').trim() || 'Chưa phân loại') === value).length;
+}
+
+/** Vẽ danh sách checkbox không có màu cố định (dùng cho Loại trung tâm / Phường/Xã) */
+function renderPlainFilter(containerId, order, activeSet, field){
+  const el = document.getElementById(containerId);
+  order.forEach(val => {
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    row.innerHTML =
+      '<input type="checkbox" ' + (activeSet.has(val) ? 'checked' : '') + '>' +
+      '<span>' + val + '</span>' +
+      '<span class="count">' + countByFallback(field, val).toLocaleString('vi-VN') + '</span>';
+    el.appendChild(row);
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) activeSet.add(val); else activeSet.delete(val);
+      buildMarkers();
+    });
+  });
+}
+
+/** Nối dây "chọn tất cả / bỏ chọn" dùng chung cho cả 4 nhóm lọc */
+function wireToggleAll(linkId, containerId, order, activeSet){
+  document.getElementById(linkId).addEventListener('click', e => {
+    e.preventDefault();
+    const boxes = document.querySelectorAll('#' + containerId + ' input[type=checkbox]');
+    const allChecked = activeSet.size === order.length;
+    boxes.forEach((box, i) => {
+      box.checked = !allChecked;
+      if (!allChecked) activeSet.add(order[i]); else activeSet.delete(order[i]);
+    });
+    buildMarkers();
+  });
+}
+
+function renderFilterLists(){
+  // Xóa sạch trước khi vẽ lại — quan trọng để không nhân đôi checkbox khi gọi lại sau khi tải thêm dữ liệu
+  ['typeFilters','wardFilters','statusFilters','confidenceFilters'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
+
+  renderPlainFilter('typeFilters', TYPE_ORDER, activeType, 'type');
+  renderPlainFilter('wardFilters', WARD_ORDER, activeWard, 'ward');
+
+  const statusEl = document.getElementById('statusFilters');
+  STATUS_ORDER.forEach(st => {
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    row.innerHTML =
+      '<input type="checkbox" ' + (activeStatus.has(st) ? 'checked' : '') + ' data-status="' + st + '">' +
+      '<span class="dot" style="background:' + (STATUS_COLOR[st] || '#8A8F8C') + '"></span>' +
+      '<span>' + st + '</span>' +
+      '<span class="count">' + countBy('status', st).toLocaleString('vi-VN') + '</span>';
+    statusEl.appendChild(row);
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) activeStatus.add(st); else activeStatus.delete(st);
+      buildMarkers();
+    });
+  });
+
+  const confEl = document.getElementById('confidenceFilters');
+  CONF_ORDER.forEach(cf => {
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    row.innerHTML =
+      '<input type="checkbox" ' + (activeConf.has(cf) ? 'checked' : '') + ' data-conf="' + cf + '">' +
+      '<span class="dot" style="background:' + (CONF_COLOR[cf] || '#8A8F8C') + '"></span>' +
+      '<span>' + cf + '</span>' +
+      '<span class="count">' + countBy('confidence', cf).toLocaleString('vi-VN') + '</span>';
+    confEl.appendChild(row);
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) activeConf.add(cf); else activeConf.delete(cf);
+      buildMarkers();
+    });
+  });
+}
+
+/** Gắn sự kiện cho các nút CỐ ĐỊNH trong sidebar (chọn tất cả, công tắc lớp) — chỉ gọi 1 LẦN DUY NHẤT
+ *  lúc khởi tạo. Không gọi lại sau khi tải thêm dữ liệu, tránh gắn trùng sự kiện nhiều lần. */
+function wireStaticControls(){
+  wireToggleAll('typeToggleAll', 'typeFilters', TYPE_ORDER, activeType);
+  wireToggleAll('wardToggleAll', 'wardFilters', WARD_ORDER, activeWard);
+  wireToggleAll('statusToggleAll', 'statusFilters', STATUS_ORDER, activeStatus);
+  wireToggleAll('confToggleAll', 'confidenceFilters', CONF_ORDER, activeConf);
+
+  ['type', 'ward', 'status', 'confidence'].forEach(key => {
+    document.getElementById('layerToggle-' + key).addEventListener('change', e => {
+      layerEnabled[key] = e.target.checked;
+      buildMarkers();
+    });
+  });
+}
+
+document.getElementById('search').addEventListener('input', e => {
+  searchTerm = normalize(e.target.value);
+  buildMarkers();
+});
+
+// ---- Header stats ----
+function renderStats(){
+  const total = DATA.length;
+  const bar = document.getElementById('statsBar');
+  bar.innerHTML =
+    '<div class="stat"><div class="n" id="shownCount">' + total.toLocaleString('vi-VN') + '</div><div class="l">Đang hiển thị</div></div>' +
+    '<div class="stat"><div class="n">' + total.toLocaleString('vi-VN') + '</div><div class="l">Có tọa độ</div></div>';
+}
+
+document.getElementById('missingNote').textContent =
+  'Bản đồ chỉ hiển thị các cơ sở ĐÃ CÓ tọa độ. Một số cơ sở trong hồ sơ gốc còn thiếu tọa độ nên chưa xuất hiện ở đây — dùng chức năng "Bổ sung dữ liệu" phía trên nếu có file mới đầy đủ hơn.';
+
+// ---- Bổ sung dữ liệu từ file Excel khác (xử lý hoàn toàn trên trình duyệt) ----
+const REQUIRED_COLS = ['Mã trung tâm', 'Tên trung tâm', 'Vỹ độ_chuẩn', 'Kinh độ_chuẩn'];
+
+document.getElementById('fileInput').addEventListener('change', function (e) {
+  const file = e.target.files[0];
+  const statusEl = document.getElementById('uploadStatus');
+  if (!file) return;
+  statusEl.textContent = 'Đang đọc file...';
+
+  const reader = new FileReader();
+  reader.onload = function (evt) {
+    try {
+      const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+      let addedTotal = 0, updatedTotal = 0, sheetsFound = 0;
+
+      wb.SheetNames.forEach(function (sheetName) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+        const headerRowIdx = rows.findIndex(function (r) { return r.indexOf('Mã trung tâm') !== -1; });
+        if (headerRowIdx === -1) return; // sheet không đúng cấu trúc -> bỏ qua
+
+        const headers = rows[headerRowIdx];
+        const col = {};
+        headers.forEach(function (h, i) { col[h] = i; });
+        if (!REQUIRED_COLS.every(function (c) { return c in col; })) return; // thiếu cột bắt buộc -> bỏ qua
+
+        let sheetAdded = 0, sheetUpdated = 0;
+        for (let r = headerRowIdx + 1; r < rows.length; r++) {
+          const row = rows[r];
+          const lat = parseFloat(row[col['Vỹ độ_chuẩn']]);
+          const lng = parseFloat(row[col['Kinh độ_chuẩn']]);
+          if (isNaN(lat) || isNaN(lng)) continue; // bỏ qua dòng chưa có tọa độ
+          const id = String(row[col['Mã trung tâm']] || '').trim();
+          if (!id) continue;
+
+          const rec = {
+            id: id,
+            name: String(row[col['Tên trung tâm']] || ''),
+            type: String(row[col['Loại trung tâm']] || ''),
+            status: String(row[col['Trạng thái trung tâm (chuẩn hóa)']] || '') || 'Chưa xác định',
+            confidence: String(row[col['Độ tin cậy']] || ''),
+            ward: String(row[col['Xã/phường']] || ''),
+            address: String(row[col['Địa chỉ trung tâm']] || ''),
+            phone: String(row[col['Điện thoại liên hệ']] || ''),
+            lat: lat, lng: lng,
+            source: sheetName, // giữ nội bộ để chống trùng lặp — KHÔNG hiển thị ra giao diện
+          };
+
+          const existingIdx = DATA.findIndex(function (d) { return d.id === id; });
+          if (existingIdx === -1) { DATA.push(rec); sheetAdded++; }
+          else { DATA[existingIdx] = rec; sheetUpdated++; }
+        }
+
+        if (sheetAdded + sheetUpdated > 0) sheetsFound++;
+        addedTotal += sheetAdded;
+        updatedTotal += sheetUpdated;
+      });
+
+      if (sheetsFound === 0) {
+        statusEl.textContent = '⚠️ Không tìm thấy dữ liệu phù hợp trong file này (cần có cột "Mã trung tâm", "Tên trung tâm", "Vỹ độ_chuẩn", "Kinh độ_chuẩn").';
+        return;
+      }
+
+      rebuildDerivedState();
+      renderFilterLists();
+      buildMarkers();
+      renderStats();
+      statusEl.innerHTML = '✅ Đã thêm <b>' + addedTotal + '</b> cơ sở mới, cập nhật <b>' + updatedTotal + '</b> cơ sở.';
+    } catch (err) {
+      statusEl.textContent = '❌ Lỗi đọc file: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function renderGeneralReportButton(){
+  const generalData = {
+    id: 'KHONG_CO_TRONG_DANH_SACH',
+    name: '(Người dân tự phát hiện — chưa có trong danh sách quản lý)',
+    address: '',
+  };
+  const container = document.getElementById('generalReportContainer');
+  if (!container) return;
+  container.innerHTML = reportButtonHtml('nguoidan',
+    '📢 Phản ánh cơ sở chưa có trong danh sách', '', generalData);
+}
+renderGeneralReportButton();
+
+// ============================================================================
+// CHẾ ĐỘ QUẢN TRỊ — khối "Bổ sung dữ liệu" chỉ hiện khi mở bản đồ kèm đúng mã bí mật trên URL,
+// ví dụ: Ban_do_giam_sat_CSGD_MVP.html?admin=MA_BI_MAT_CUA_BAN
+// Đổi ADMIN_ACCESS_KEY bên dưới thành 1 chuỗi bạn tự chọn (không dùng giá trị mặc định).
+// ⚠️ LƯU Ý QUAN TRỌNG: đây KHÔNG PHẢI cơ chế bảo mật thật — đây là file HTML tĩnh chạy hoàn toàn
+// trên trình duyệt, ai xem "View page source" đều có thể thấy mã này. Chỉ phù hợp để tránh người
+// dùng thông thường vô tình thấy/bấm nhầm nút quản trị, KHÔNG dùng để bảo vệ dữ liệu nhạy cảm.
+// Muốn bảo mật thật sự cần một hệ thống có đăng nhập/backend (giai đoạn phát triển sau).
+// ============================================================================
+const ADMIN_ACCESS_KEY = "CHUA_DAT_MA__DOI_CHUOI_NAY";
+const isAdminMode = ADMIN_ACCESS_KEY !== "CHUA_DAT_MA__DOI_CHUOI_NAY"
+  && new URLSearchParams(window.location.search).get('admin') === ADMIN_ACCESS_KEY;
+if (isAdminMode) {
+  document.getElementById('uploadSection').style.display = '';
+}
+
+// ============================================================================
+// 🌐 NGUỒN DỮ LIỆU TRỰC TIẾP TỪ GOOGLE SHEETS — dán URL Web App vào đây (lấy được sau khi Deploy
+// Apps Script dạng Web app). Khi đã cấu hình, bản đồ TỰ tải dữ liệu mới nhất mỗi khi mở trang —
+// không cần xuất lại file HTML này mỗi khi có cơ sở mới nữa. Nếu để trống/chưa cấu hình, hoặc tải
+// lỗi (mất mạng, Apps Script tạm ngưng...), bản đồ tự dùng dữ liệu nhúng sẵn phía trên làm dự phòng.
+// ============================================================================
+const DATA_SOURCE_URL = "https://script.google.com/macros/s/AKfycbw3enYaAOr0kc6k_TmWaoH5rV3oZ7T-HaqZX31ajzIfynjvQVdAVbLAL8WjSlH5KmWz6Q/exec";
+
+async function loadLiveDataThenInit() {
+  const statusNote = document.getElementById('missingNote');
+  const configured = DATA_SOURCE_URL && DATA_SOURCE_URL.indexOf("CHUA_CAU_HINH") !== 0;
+
+  if (configured) {
+    statusNote.textContent = '⏳ Đang tải dữ liệu mới nhất từ Google Sheets... (có thể mất vài giây)';
+    try {
+      // QUAN TRỌNG: chống trình duyệt CACHE lại kết quả cũ — nếu không, những lần mở bản đồ sau có
+      // thể vẫn hiện dữ liệu cũ (vd chỉ có sheet 02) dù dữ liệu gốc đã cập nhật thêm (vd sheet 03),
+      // và phải bấm F5/Ctrl+Shift+R mới thấy đúng — thêm cache:'no-store' + tham số thời gian vào URL
+      // để mỗi lần tải luôn là 1 request MỚI hoàn toàn, không lấy từ bộ nhớ đệm.
+      const bustedUrl = DATA_SOURCE_URL + (DATA_SOURCE_URL.indexOf('?') === -1 ? '?' : '&') + '_t=' + Date.now();
+      const resp = await fetch(bustedUrl, { cache: 'no-store' });
+      const liveRecords = await resp.json();
+      if (Array.isArray(liveRecords) && liveRecords.length > 0) {
+        DATA = liveRecords;
+        rebuildDerivedState();
+        statusNote.textContent = '';
+      } else {
+        throw new Error('Dữ liệu trả về rỗng hoặc sai định dạng');
+      }
+    } catch (err) {
+      console.error('Không tải được dữ liệu trực tiếp từ Google Sheets:', err);
+      statusNote.textContent = '❌ KHÔNG tải được dữ liệu từ Google Sheets — bản đồ đang TRỐNG. '
+        + 'Kiểm tra kết nối mạng và thử tải lại trang (F5). Nếu vẫn lỗi, báo quản trị viên kiểm tra '
+        + 'trạng thái Web App (Apps Script).';
+    }
+  } else {
+    statusNote.textContent = '⚠️ Chưa cấu hình DATA_SOURCE_URL — bản đồ không có dữ liệu để hiển thị.';
+  }
+
+  renderStats();
+  renderFilterLists();
+  wireStaticControls();
+  buildMarkers();
+
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+
+  const searchBox = document.getElementById('search');
+  if (searchBox) {
+    searchBox.disabled = false;
+    searchBox.placeholder = 'Tìm theo tên cơ sở...';
+  }
+}
+
+loadLiveDataThenInit();
+
+// ---- Mở/đóng thanh bên trên di động & tablet (≤900px) ----
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarBackdrop').classList.add('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarBackdrop').classList.remove('show');
+}
+document.getElementById('sidebarToggle').addEventListener('click', openSidebar);
+document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
+document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebar);
+// Bấm chọn 1 điểm trên bản đồ (di động) -> tự đóng thanh bên để xem toàn màn hình
+map.on('click', () => { if (window.innerWidth <= 900) closeSidebar(); });
+</script>
+</body>
+</html>
