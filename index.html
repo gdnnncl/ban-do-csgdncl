@@ -98,6 +98,16 @@
   }
   #search:focus{outline:2px solid var(--accent-dim);border-color:var(--accent);}
 
+  #missingCoordSearch{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;
+    font-size:13px;font-family:inherit;margin-bottom:6px;
+  }
+  #missingCoordSearch:focus{outline:2px solid var(--accent-dim);border-color:var(--accent);}
+  .missing-coord-item{padding:8px 6px;border-bottom:1px solid var(--line);}
+  .missing-coord-item:last-child{border-bottom:none;}
+  .missing-coord-item .mc-name{font-weight:600;font-size:12px;}
+  .missing-coord-item .mc-address{font-size:11px;color:var(--muted);margin:2px 0 6px;}
+
   .legend-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:10px;background:#F0F2F1;border-radius:6px;margin-top:6px;}
 
   #mapWrap{flex:1;position:relative;}
@@ -298,6 +308,12 @@
       <div class="filter-group">
         <h2>Không thấy cơ sở bạn cần?</h2>
         <div id="generalReportContainer"></div>
+      </div>
+
+      <div class="filter-group">
+        <h2>📍 Cơ sở chưa có tọa độ?</h2>
+        <input type="text" id="missingCoordSearch" placeholder="Gõ tên cơ sở để tìm & cập nhật...">
+        <div id="missingCoordResults" class="scroll-filter" style="display:none;"></div>
       </div>
     </div>
     <div id="mapWrap">
@@ -622,6 +638,7 @@ const REPORT_FORM_TEMPLATES = {
   nguoidan: "https://docs.google.com/forms/d/e/1FAIpQLSeGyn6ziRrk_z4zLGaLxniuHPktNnuyfpDUeuLWQwutV9UmUg/viewform?usp=pp_url&entry.1745038826=__MA__&entry.90242034=__TEN__&entry.1927556517=__DIACHI__",
   chucoso: "https://docs.google.com/forms/d/e/1FAIpQLScnnaIsN1HEmLN6ZNzS_iPY2inKNk5JYeAik1s0d6OdJtQWRg/viewform?usp=pp_url&entry.1791113250=__MA__&entry.421319637=__TEN__&entry.1425715673=__DIACHI__",
   canbo: "https://docs.google.com/forms/d/e/1FAIpQLSeGhCE4eMD9pQacXNxRt-MM6B4tLSHMDnTYTernWOkLy1ok7Q/viewform?usp=pp_url&entry.352916800=__MA__&entry.1296127509=__TEN__&entry.1972051029=__DIACHI__",
+  toado: "https://docs.google.com/forms/d/e/1FAIpQLSfASQQGpB060SxySJCUFkD-Ex7E8XKUbKh57ZSJ0Hw_b7gIBg/viewform?usp=pp_url&entry.1056818=__MA__&entry.1805445880=__TEN__&entry.1166689546=__DIACHI__",
 };
 
 function buildReportUrl(role, d) {
@@ -849,6 +866,68 @@ function renderGeneralReportButton(){
     '📢 Phản ánh cơ sở chưa có trong danh sách', '', generalData);
 }
 renderGeneralReportButton();
+
+// ---- Tìm & cập nhật cơ sở CHƯA CÓ tọa độ (dành cho chủ cơ sở / cán bộ phường xã) ----
+// Danh sách này KHÔNG nằm trong DATA thường (DATA chỉ chứa cơ sở ĐÃ CÓ tọa độ để vẽ điểm) — phải tải
+// riêng, và chỉ tải khi người dùng thực sự bấm vào ô tìm kiếm này (tải lười — "lazy") để không tốn
+// thêm 1 lượt gọi máy chủ cho những ai không dùng tới tính năng này.
+let missingCoordList = null;
+let missingCoordLoading = null;
+
+async function loadMissingCoordListIfNeeded() {
+  if (missingCoordList) return missingCoordList;
+  if (missingCoordLoading) return missingCoordLoading; // đang tải rồi (vd gõ nhanh nhiều ký tự) -> chờ chung 1 lần tải
+  if (!DATA_SOURCE_URL || DATA_SOURCE_URL.indexOf("CHUA_CAU_HINH") === 0) { missingCoordList = []; return missingCoordList; }
+
+  missingCoordLoading = (async () => {
+    try {
+      const sep = DATA_SOURCE_URL.indexOf('?') === -1 ? '?' : '&';
+      const url = DATA_SOURCE_URL + sep + 'mode=missing&_t=' + Date.now();
+      const resp = await fetch(url, { cache: 'no-store' });
+      const json = await resp.json();
+      missingCoordList = Array.isArray(json) ? json : [];
+    } catch (err) {
+      console.error('Không tải được danh sách cơ sở chưa có tọa độ:', err);
+      missingCoordList = [];
+    }
+    return missingCoordList;
+  })();
+  return missingCoordLoading;
+}
+
+function renderMissingCoordResults(matches, term) {
+  const box = document.getElementById('missingCoordResults');
+  if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = '';
+
+  if (matches.length === 0) {
+    box.innerHTML = '<div class="legend-note" style="margin:0">Không tìm thấy cơ sở nào khớp trong danh sách đang thiếu tọa độ.</div>';
+    return;
+  }
+  box.innerHTML = matches.slice(0, 25).map(function (r) {
+    const link = buildReportUrl('toado', r);
+    const btn = (link !== '#')
+      ? '<a class="report-btn" style="margin-top:0" href="' + link + '" target="_blank" rel="noopener">📍 Gửi tọa độ / Place ID cho cơ sở này</a>'
+      : '<span style="font-size:11px;color:#C0392B">⚠️ Form chưa được cấu hình — báo quản trị viên</span>';
+    return '<div class="missing-coord-item">'
+      + '<div class="mc-name">' + escapeHtml(r.name) + '</div>'
+      + '<div class="mc-address">' + escapeHtml(r.address || r.type || '') + '</div>'
+      + btn + '</div>';
+  }).join('') + (matches.length > 25
+    ? '<div class="legend-note" style="margin:6px 0 0">Còn ' + (matches.length - 25) + ' kết quả khác — gõ cụ thể hơn để thu hẹp.</div>' : '');
+}
+
+document.getElementById('missingCoordSearch').addEventListener('input', async function (e) {
+  const term = normalize(e.target.value);
+  const box = document.getElementById('missingCoordResults');
+  if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  box.style.display = '';
+  box.innerHTML = '<div class="legend-note" style="margin:0">⏳ Đang tìm...</div>';
+  const list = await loadMissingCoordListIfNeeded();
+  const matches = list.filter(function (r) { return normalize(r.name).indexOf(term) !== -1; });
+  renderMissingCoordResults(matches, term);
+});
 
 // ============================================================================
 // CHẾ ĐỘ QUẢN TRỊ — khối "Bổ sung dữ liệu" chỉ hiện khi mở bản đồ kèm đúng mã bí mật trên URL,
