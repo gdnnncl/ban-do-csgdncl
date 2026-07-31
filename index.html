@@ -359,7 +359,7 @@ function buildAutoColors(order){
 // thì bản đồ tô theo lớp đó và hộp chú thích hiển thị đúng lớp đó.
 const PRIORITY = ['type', 'ward', 'status', 'confidence'];
 const LAYER_META = {
-  type:       { label: 'Loại trung tâm',        field: 'type',       order: TYPE_ORDER,   colors: buildAutoColors(TYPE_ORDER) },
+  type:       { label: 'Loại hình đơn vị',        field: 'type',       order: TYPE_ORDER,   colors: buildAutoColors(TYPE_ORDER) },
   ward:       { label: 'Phường/Xã',              field: 'ward',       order: WARD_ORDER,   colors: buildAutoColors(WARD_ORDER) },
   status:     { label: 'Trạng thái hoạt động',   field: 'status',     order: STATUS_ORDER, colors: STATUS_COLOR },
   confidence: { label: 'Độ tin cậy tọa độ',      field: 'confidence', order: CONF_ORDER,   colors: CONF_COLOR },
@@ -481,7 +481,7 @@ function buildPopupHtml(d, detail) {
     '<div class="report-label">📢 Bạn muốn phản ánh / cập nhật với vai trò nào?</div>' +
     reportButtonHtml('nguoidan', '🙋 Người dân — báo sai lệch/ngừng hoạt động', '', merged) +
     reportButtonHtml('chucoso', '🏢 Chủ cơ sở — xác nhận/cập nhật thông tin', 'report-btn-alt', merged) +
-    reportButtonHtml('canbo', '👮 Cán bộ P/X — xác nhận kiểm tra thực địa', 'report-btn-alt2', merged) +
+    reportButtonHtml('canbo', '👮 Cán bộ phường/xã — xác nhận kiểm tra thực địa', 'report-btn-alt2', merged) +
     '</div>' +
     '</div>';
 }
