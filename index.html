@@ -87,6 +87,12 @@
   .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
   .filter-row .count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;}
 
+  .type-group-divider{
+    font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;
+    color:var(--accent);margin:12px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--line);
+  }
+  .type-group-divider:first-child{margin-top:0;}
+
   #fileInput{
     width:100%;font-size:12px;margin-bottom:8px;padding:6px;
     border:1px dashed var(--line);border-radius:6px;background:#F0F2F1;
@@ -356,7 +362,45 @@ function distinctSorted(field){
     const v = (d[field] || '').trim() || 'Chưa phân loại';
     counts[v] = (counts[v] || 0) + 1;
   });
-  return Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+  const keys = Object.keys(counts);
+  if (field === 'type') return sortByTypeGroup(keys);
+  return keys.sort((a,b) => counts[b] - counts[a]);
+}
+
+// Lược đồ 3 nhóm loại hình đơn vị CỐ ĐỊNH (không đổi theo số lượng cơ sở) — quyết định thứ tự hiển
+// thị trong bộ lọc "Loại hình đơn vị" ở thanh bên. Loại nào không có tên trong danh sách này (vd phát
+// sinh sau này) sẽ tự động xếp xuống cuối, không làm vỡ giao diện.
+const TYPE_GROUPS = [
+  { label: 'Nhóm 1 — CSGD ngắn hạn', types: [
+      'Trung tâm tin học – ngoại ngữ',
+      'Tổ chức kinh doanh dịch vụ tư vấn du học',
+      'Trung tâm Kỹ năng sống và hoạt động ngoài giờ',
+      'CSGD Ngắn hạn có vốn đầu tư nước ngoài',
+      'TT Hỗ trợ và phát triển giáo dục hòa nhập',
+      'Văn phòng đại diện',
+    ] },
+  { label: 'Nhóm 2 — Trường phổ thông', types: [
+      'Trường phổ thông',
+    ] },
+  { label: 'Nhóm 3 — Cao đẳng / Trung cấp / GDNN', types: [
+      'Trường cao đẳng tư thục',
+      'Trường trung cấp tư thục',
+      'Trung tâm GDNN',
+      'Doanh nghiệp hoạt động GDNN',
+    ] },
+];
+const TYPE_GROUP_ORDER = TYPE_GROUPS.reduce((arr, g) => arr.concat(g.types), []);
+function typeGroupLabelOf_(val){
+  for (const g of TYPE_GROUPS) if (g.types.includes(val)) return g.label;
+  return null; // loại lạ không thuộc nhóm nào đã định nghĩa
+}
+function sortByTypeGroup(keys){
+  return keys.slice().sort((a, b) => {
+    let ia = TYPE_GROUP_ORDER.indexOf(a); if (ia === -1) ia = TYPE_GROUP_ORDER.length;
+    let ib = TYPE_GROUP_ORDER.indexOf(b); if (ib === -1) ib = TYPE_GROUP_ORDER.length;
+    if (ia !== ib) return ia - ib;
+    return a.localeCompare(b, 'vi'); // cùng hạng (đều là loại lạ) -> xếp theo bảng chữ cái cho ổn định
+  });
 }
 const TYPE_ORDER = distinctSorted('type');
 const WARD_ORDER = distinctSorted('ward');
@@ -635,10 +679,10 @@ function escapeHtml(s){
 // thật của từng cơ sở khi người dùng bấm nút tương ứng trên bản đồ.
 // ============================================================================
 const REPORT_FORM_TEMPLATES = {
-  nguoidan: "https://docs.google.com/forms/d/e/1FAIpQLSeGyn6ziRrk_z4zLGaLxniuHPktNnuyfpDUeuLWQwutV9UmUg/viewform?usp=pp_url&entry.1745038826=__MA__&entry.90242034=__TEN__&entry.1927556517=__DIACHI__",
-  chucoso: "https://docs.google.com/forms/d/e/1FAIpQLScnnaIsN1HEmLN6ZNzS_iPY2inKNk5JYeAik1s0d6OdJtQWRg/viewform?usp=pp_url&entry.1791113250=__MA__&entry.421319637=__TEN__&entry.1425715673=__DIACHI__",
-  canbo: "https://docs.google.com/forms/d/e/1FAIpQLSeGhCE4eMD9pQacXNxRt-MM6B4tLSHMDnTYTernWOkLy1ok7Q/viewform?usp=pp_url&entry.352916800=__MA__&entry.1296127509=__TEN__&entry.1972051029=__DIACHI__",
-  toado: "https://docs.google.com/forms/d/e/1FAIpQLSfASQQGpB060SxySJCUFkD-Ex7E8XKUbKh57ZSJ0Hw_b7gIBg/viewform?usp=pp_url&entry.1056818=__MA__&entry.1805445880=__TEN__&entry.1166689546=__DIACHI__",
+  nguoidan:  "CHUA_CAU_HINH__DAN_URL_MAU_NGUOI_DAN_VAO_DAY",
+  chucoso:   "CHUA_CAU_HINH__DAN_URL_MAU_CHU_CO_SO_VAO_DAY",
+  canbo:     "CHUA_CAU_HINH__DAN_URL_MAU_CAN_BO_PX_VAO_DAY",
+  toado:     "CHUA_CAU_HINH__DAN_URL_MAU_CAP_NHAT_TOA_DO_VAO_DAY",
 };
 
 function buildReportUrl(role, d) {
@@ -691,6 +735,34 @@ function renderPlainFilter(containerId, order, activeSet, field){
   });
 }
 
+/** Vẽ riêng bộ lọc "Loại hình đơn vị" — có chèn tiêu đề phân nhóm (Nhóm 1/2/3) xen giữa danh sách,
+ *  khác với renderPlainFilter dùng chung (không có khái niệm nhóm) đang dùng cho Phường/Xã. */
+function renderTypeFilter(containerId, order, activeSet, field){
+  const el = document.getElementById(containerId);
+  let lastGroupLabel = null;
+  order.forEach(val => {
+    const groupLabel = typeGroupLabelOf_(val);
+    if (groupLabel !== lastGroupLabel) {
+      const divider = document.createElement('div');
+      divider.className = 'type-group-divider';
+      divider.textContent = groupLabel || 'Khác';
+      el.appendChild(divider);
+      lastGroupLabel = groupLabel;
+    }
+    const row = document.createElement('label');
+    row.className = 'filter-row';
+    row.innerHTML =
+      '<input type="checkbox" ' + (activeSet.has(val) ? 'checked' : '') + '>' +
+      '<span>' + val + '</span>' +
+      '<span class="count">' + countByFallback(field, val).toLocaleString('vi-VN') + '</span>';
+    el.appendChild(row);
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) activeSet.add(val); else activeSet.delete(val);
+      buildMarkers();
+    });
+  });
+}
+
 /** Nối dây "chọn tất cả / bỏ chọn" dùng chung cho cả 4 nhóm lọc */
 function wireToggleAll(linkId, containerId, order, activeSet){
   document.getElementById(linkId).addEventListener('click', e => {
@@ -711,7 +783,7 @@ function renderFilterLists(){
     document.getElementById(id).innerHTML = '';
   });
 
-  renderPlainFilter('typeFilters', TYPE_ORDER, activeType, 'type');
+  renderTypeFilter('typeFilters', TYPE_ORDER, activeType, 'type');
   renderPlainFilter('wardFilters', WARD_ORDER, activeWard, 'ward');
 
   const statusEl = document.getElementById('statusFilters');
