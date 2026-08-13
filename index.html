@@ -46,6 +46,42 @@
   .stat .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
   .stat .l{font-size:10.5px;color:#B9C3C0;text-transform:uppercase;letter-spacing:0.4px;}
 
+  #helpBtn{
+    padding:8px 16px;border-radius:20px;border:1px solid rgba(255,255,255,0.35);
+    background:rgba(255,255,255,0.08);color:#fff;font-size:13px;font-weight:600;
+    cursor:pointer;white-space:nowrap;flex-shrink:0;
+  }
+  #helpBtn:hover{background:rgba(255,255,255,0.18);}
+
+  #helpBackdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2100;
+  }
+  #helpBackdrop.show{display:block;}
+  #helpModal{
+    display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(560px,90vw);max-height:82vh;background:#fff;border-radius:12px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.3);z-index:2101;
+    flex-direction:column;overflow:hidden;
+  }
+  #helpModal.show{display:flex;}
+  #helpModalHeader{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  #helpModalHeader h2{margin:0;font-size:16px;color:var(--ink);}
+  #helpCloseBtn{
+    border:none;background:none;font-size:18px;color:var(--muted);cursor:pointer;
+    width:32px;height:32px;border-radius:6px;
+  }
+  #helpCloseBtn:hover{background:#F0F2F1;color:var(--ink);}
+  #helpModalBody{overflow-y:auto;padding:16px 20px 24px;}
+  .help-section{margin-bottom:20px;}
+  .help-section:last-child{margin-bottom:0;}
+  .help-section h3{font-size:14px;margin:0 0 8px;color:var(--accent);}
+  .help-section ul{margin:0;padding-left:20px;}
+  .help-section li{font-size:13px;line-height:1.6;margin-bottom:6px;color:var(--ink);}
+  .help-section li:last-child{margin-bottom:0;}
+
   #main{flex:1;display:flex;min-height:0;}
 
   #sidebar{
@@ -145,6 +181,13 @@
   }
   @keyframes spin{to{transform:rotate(360deg);}}
 
+  .popup-mini-spinner{
+    display:inline-block;width:11px;height:11px;border-radius:50%;
+    border:2px solid var(--line);border-top-color:var(--accent);
+    animation:spin 0.7s linear infinite;
+    margin-right:6px;vertical-align:middle;
+  }
+
   .leaflet-popup-content-wrapper{border-radius:8px;}
 
   .marker-tooltip.leaflet-tooltip{
@@ -225,6 +268,10 @@
     header .stats{gap:12px;}
     .stat .n{font-size:15px;}
     .stat .l{font-size:9px;}
+    #helpBtn{padding:6px 10px;font-size:11.5px;}
+
+    #helpModal{width:94vw;max-height:88vh;}
+    #helpModalBody{padding:14px 16px 20px;}
 
     #sidebarToggle{left:8px;bottom:180px;padding:8px 12px;font-size:12px;} /* legend thấp hơn trên điện thoại -> nút cũng hạ theo */
 
@@ -255,7 +302,59 @@
       <p>Thuộc Sở Giáo dục và Đào tạo Thành phố Hồ Chí Minh</p>
     </div>
     <div class="stats" id="statsBar"></div>
+    <button id="helpBtn" aria-label="Hướng dẫn sử dụng">❓ Hướng dẫn</button>
   </header>
+
+  <div id="helpBackdrop"></div>
+  <div id="helpModal" role="dialog" aria-label="Hướng dẫn sử dụng">
+    <div id="helpModalHeader">
+      <h2>❓ Hướng dẫn sử dụng nhanh</h2>
+      <button id="helpCloseBtn" aria-label="Đóng hướng dẫn">✕</button>
+    </div>
+    <div id="helpModalBody">
+      <section class="help-section">
+        <h3>🔎 Dành cho mọi người</h3>
+        <ul>
+          <li>Gõ tên cơ sở vào ô <b>"Tìm theo tên cơ sở"</b> ở góc trên thanh bên trái để tìm nhanh.</li>
+          <li>Dùng các bộ lọc bên trái (<b>Loại hình đơn vị</b>, <b>Phường/Xã</b>, <b>Trạng thái hoạt động</b>, <b>Độ tin cậy tọa độ</b>) để thu hẹp kết quả — bấm vào ô vuông để bật/tắt từng mục, hoặc dùng liên kết "chọn tất cả / bỏ chọn".</li>
+          <li>Bấm vào <b>1 điểm chấm màu</b> trên bản đồ để xem đầy đủ thông tin (địa chỉ, SĐT, website, Place ID...).</li>
+          <li>Rê chuột qua 1 điểm (trên máy tính) để xem nhanh tên, không cần bấm vào.</li>
+          <li>Ý nghĩa màu sắc các điểm đang hiện ở <b>hộp chú thích góc dưới trái</b> bản đồ, thay đổi theo lớp thông tin đang bật ưu tiên cao nhất.</li>
+        </ul>
+      </section>
+
+      <section class="help-section">
+        <h3>🙋 Dành cho Người dân</h3>
+        <ul>
+          <li>Thấy thông tin 1 cơ sở bị sai, hoặc cơ sở đã ngừng hoạt động? Bấm vào điểm đó trên bản đồ → chọn nút <b>"🙋 Người dân"</b> → điền phản ánh.</li>
+          <li>Cơ sở <b>CHƯA CÓ</b> trên bản đồ? Cuộn xuống cuối thanh bên trái, dùng mục <b>"Không thấy cơ sở bạn cần?"</b>.</li>
+        </ul>
+      </section>
+
+      <section class="help-section">
+        <h3>🏢 Dành cho Chủ cơ sở</h3>
+        <ul>
+          <li>Bấm vào đúng điểm của cơ sở mình → chọn nút <b>"🏢 Chủ cơ sở"</b> → điền thông tin cần cập nhật (cần điền đúng SĐT đã đăng ký trong hồ sơ để đối chiếu xác thực).</li>
+          <li>Cơ sở của bạn <b>CHƯA CÓ tọa độ</b> nên chưa hiện trên bản đồ? Cuộn xuống cuối thanh bên trái, dùng mục <b>"📍 Cơ sở chưa có tọa độ?"</b> — gõ tên cơ sở, bấm nút gửi tọa độ/Place ID.</li>
+        </ul>
+      </section>
+
+      <section class="help-section">
+        <h3>👮 Dành cho Cán bộ phường/xã</h3>
+        <ul>
+          <li>Sau khi kiểm tra thực địa 1 cơ sở: bấm vào điểm đó trên bản đồ → chọn nút <b>"👮 Cán bộ phường/xã"</b> → điền kết quả kiểm tra.</li>
+        </ul>
+      </section>
+
+      <section class="help-section">
+        <h3>ℹ️ Lưu ý chung</h3>
+        <ul>
+          <li>Mọi phản ánh/cập nhật đều được cán bộ quản lý xem xét trước khi áp dụng chính thức — không hiển thị thay đổi ngay lập tức.</li>
+          <li>Thông tin liên hệ (SĐT, địa chỉ...) chỉ hiện khi bạn bấm vào từng cơ sở cụ thể, không cung cấp hàng loạt cho toàn bộ danh sách.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
   <div id="main">
     <div id="sidebar">
       <button id="sidebarClose" aria-label="Đóng bộ lọc">✕ Đóng</button>
@@ -354,6 +453,22 @@
 </div>
 
 <script>
+// ---- Mở/đóng hộp thoại Hướng dẫn — CỐ Ý đặt NGAY ĐẦU script, chạy trước mọi logic liên quan tới
+// Leaflet/bản đồ, để nút Hướng dẫn LUÔN hoạt động độc lập, kể cả khi bản đồ tải lỗi (mất mạng, CDN
+// sập...) — người dùng vẫn đọc được hướng dẫn dù bản đồ có vấn đề.
+function openHelp(){
+  document.getElementById('helpModal').classList.add('show');
+  document.getElementById('helpBackdrop').classList.add('show');
+}
+function closeHelp(){
+  document.getElementById('helpModal').classList.remove('show');
+  document.getElementById('helpBackdrop').classList.remove('show');
+}
+document.getElementById('helpBtn').addEventListener('click', openHelp);
+document.getElementById('helpCloseBtn').addEventListener('click', closeHelp);
+document.getElementById('helpBackdrop').addEventListener('click', closeHelp);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHelp(); });
+
 // KHÔNG còn dữ liệu nhúng cứng trong mã nguồn — trang khởi động HOÀN TOÀN RỖNG, chỉ có dữ liệu sau
 // khi trình duyệt tự gọi tới DATA_SOURCE_URL (xem bên dưới) lúc mở trang. Xem "View Page Source"
 // hoặc mã nguồn trên GitHub sẽ KHÔNG thấy bất kỳ thông tin đơn vị nào được nhúng sẵn ở đây.
@@ -533,7 +648,7 @@ function buildPopupHtml(d, detail) {
     '<div class="row"><b>Phường/Xã:</b> ' + escapeHtml(d.ward) + '</div>';
 
   if (!detail) {
-    return base + '<div class="row" style="color:var(--muted)">⏳ Đang tải địa chỉ, liên hệ...</div></div>';
+    return base + '<div class="row" style="color:var(--muted)"><span class="popup-mini-spinner"></span>Đang tải địa chỉ, liên hệ...</div></div>';
   }
   if (!detail.address && !detail.phone && !detail.website) {
     // fetchDetail thất bại (mất mạng, chưa cấu hình DATA_SOURCE_URL...) hoặc không tìm thấy bản ghi
@@ -620,6 +735,32 @@ function buildMarkers(){
 
     marker.bindPopup(buildPopupHtml(d, null),
       { maxWidth: Math.min(window.innerWidth - 40, 320), autoPanPadding: [16, 60] });
+
+    // TỐI ƯU TỐC ĐỘ: rê chuột qua (trên máy tính) là dấu hiệu người dùng CÓ Ý ĐỊNH bấm vào — tranh
+    // thủ tải trước dữ liệu chi tiết NGAY LÚC ĐÓ (chạy ngầm, không chờ), để khi họ thực sự bấm vào,
+    // dữ liệu thường đã có sẵn trong bộ nhớ đệm, hiện popup gần như tức thì thay vì phải chờ.
+    // LƯU Ý QUAN TRỌNG: đây VẪN chỉ tải cho ĐÚNG 1 cơ sở tại một thời điểm (cơ sở đang được rê chuột
+    // tới) — không phải tải trước cho toàn bộ điểm trên bản đồ, giữ đúng nguyên tắc không lộ dữ liệu
+    // liên hệ hàng loạt. Trên điện thoại/máy tính bảng không có khái niệm "rê chuột" nên không áp
+    // dụng được tối ưu này — chạm vào vẫn tải như bình thường lúc bấm.
+    marker.on('mouseover', function () {
+      if (!detailCache[d.id]) {
+        fetchDetail(d.id).then(function (detail) {
+          if (detail) detailCache[d.id] = detail;
+        });
+      }
+    });
+    // 'mousedown' cũng tương ứng với lúc NGÓN TAY VỪA CHẠM XUỐNG trên điện thoại/tablet (Leaflet tự
+    // quy đổi sự kiện chạm về cùng hệ sự kiện chuột) — tranh thủ khoảng thời gian rất ngắn giữa lúc
+    // chạm và lúc bấm hoàn tất để tải sớm, giúp cả người dùng di động cũng được hưởng lợi phần nào
+    // từ cơ chế tải trước này, không chỉ riêng máy tính có chuột.
+    marker.on('mousedown', function () {
+      if (!detailCache[d.id]) {
+        fetchDetail(d.id).then(function (detail) {
+          if (detail) detailCache[d.id] = detail;
+        });
+      }
+    });
 
     // Chỉ gọi tải thông tin chi tiết (địa chỉ/SĐT/Website/Place ID) khi người dùng THỰC SỰ bấm vào
     // đúng điểm này — không tải sẵn cho toàn bộ 1 lúc, tránh lộ thông tin liên hệ hàng loạt.
