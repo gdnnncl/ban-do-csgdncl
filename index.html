@@ -617,9 +617,13 @@ function rebuildDerivedState(){
 // Dùng nền CartoDB Positron (tối giản, không hiển thị ký hiệu nhà hàng/khách sạn/siêu thị/quán ăn...
 // như nền OpenStreetMap chuẩn) — chỉ còn đường sá, tên khu vực, phù hợp để nhấn mạnh dữ liệu cơ sở
 // giáo dục do Sở quản lý, không bị lẫn với các điểm dịch vụ thương mại không liên quan.
-// preferCanvas:true — với 4.000+ điểm, vẽ bằng 1 lớp Canvas duy nhất NHANH HƠN NHIỀU so với mặc định
-// (tạo riêng 1 thẻ SVG cho mỗi điểm) — khác biệt rõ rệt nhất trên điện thoại, nơi CPU yếu hơn máy tính.
-const map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([10.78, 106.68], 11);
+// LƯU Ý: đã THỬ preferCanvas:true để tăng tốc vẽ 4.000+ điểm, nhưng thực tế đo được lại CHẬM HƠN —
+// nguyên nhân: bản đồ có nhiều sự kiện tương tác gắn trên từng điểm (rê chuột tải trước, bấm, tooltip),
+// với Canvas, trình duyệt phải TỰ DÒ THỦ CÔNG từng điểm trong toàn bộ danh sách mỗi khi di chuột để
+// biết có đang chạm vào điểm nào không (không có phần cứng hỗ trợ như cách vẽ mặc định) — với số lượng
+// điểm lớn, việc dò liên tục này tốn hơn cả lợi ích tiết kiệm được lúc vẽ ban đầu. Đã bỏ lại, dùng
+// đúng cách vẽ mặc định (mỗi điểm là 1 phần tử riêng, trình duyệt tự hỗ trợ dò chạm hiệu quả hơn).
+const map = L.map('map', { zoomControl: true }).setView([10.78, 106.68], 11);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 19,
   attribution: '&copy; OpenStreetMap contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -851,6 +855,7 @@ const REPORT_FORM_TEMPLATES = {
   canbo: "https://docs.google.com/forms/d/e/1FAIpQLSfcd_A9KBvVdBuWDQUy6VDvGIYdgFh49wBgBezPK84BlKSo4g/viewform?usp=pp_url&entry.56615684=__MA__&entry.1482818291=__TEN__&entry.817055363=__DIACHI__",
   toado: "https://docs.google.com/forms/d/e/1FAIpQLSeg8BrRlZYa9D2TS6XkcGteEM1_c6BuqWuYEFmmZcly7jL9OQ/viewform?usp=pp_url&entry.668598238=__MA__&entry.571953292=__TEN__&entry.1963374808=__DIACHI__",
 };
+
 function buildReportUrl(role, d) {
   const tpl = REPORT_FORM_TEMPLATES[role];
   if (!tpl || tpl.indexOf("CHUA_CAU_HINH") === 0) return "#";
