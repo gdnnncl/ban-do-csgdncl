@@ -25,7 +25,7 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--paper);color:var(--ink);}
-  #app{display:flex;flex-direction:column;height:100vh;}
+  #app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 
   header{
     padding:14px 20px;
@@ -250,7 +250,7 @@
     #sidebarClose{display:block;}
 
     #sidebar{
-      position:fixed;top:0;left:0;height:100%;width:82%;max-width:340px;
+      position:fixed;top:0;left:0;height:100vh;height:100dvh;width:82%;max-width:340px;
       transform:translateX(-100%);transition:transform .25s ease;z-index:1500;
       box-shadow:2px 0 16px rgba(0,0,0,0.25);
     }
