@@ -707,6 +707,16 @@ async function fetchDetail(id) {
   }
 }
 
+// Bán kính điểm theo mức zoom — zoom xa (nhìn toàn thành phố) dùng điểm NHỎ để không che mất đường,
+// zoom gần tới mức thấy rõ tên đường mới phóng lớn hơn — nhưng tối đa cũng chỉ bằng 1/2 kích thước
+// cũ (5.5px) để không còn tình trạng điểm quá to lấn át chi tiết bản đồ như trước.
+function radiusForZoom_(zoom) {
+  if (zoom >= 16) return 2.8; // đã thấy rõ tên đường -> lớn nhất, nhưng chỉ ~1/2 so với 5.5px cũ
+  if (zoom >= 14) return 2.3;
+  if (zoom >= 12) return 1.9;
+  return 1.6; // zoom xa, nhìn toàn thành phố -> nhỏ nhất, ưu tiên nhìn rõ đường sá
+}
+
 function buildMarkers(){
   markers.forEach(m => map.removeLayer(m));
   markers = [];
@@ -730,7 +740,7 @@ function buildMarkers(){
     }
 
     const marker = L.circleMarker([d.lat, d.lng], {
-      radius: 5.5,
+      radius: radiusForZoom_(map.getZoom()),
       color: "#fff",
       weight: 1,
       fillColor: color,
@@ -805,10 +815,13 @@ function renderLegend(activeLayer, tallies){
     return;
   }
   const meta = LAYER_META[activeLayer];
-  const rows = meta.order
-    .map(val => ({ val: val, cnt: tallies[val] || 0, color: meta.colors[val] || '#999' }))
-    .filter(r => r.cnt > 0)
-    .sort((a, b) => b.cnt - a.cnt)
+  // "Loại hình đơn vị" giữ ĐÚNG thứ tự đã định sẵn theo 3 nhóm trong menu (không sắp lại theo số
+  // lượng) — vì TYPE_ORDER đã được xếp theo nhóm cố định (xem sortByTypeGroup), còn các lớp khác
+  // (Phường/Xã...) vẫn ưu tiên hiển thị mục có nhiều cơ sở nhất lên đầu như trước.
+  const rowsData = meta.order.map(val => ({ val: val, cnt: tallies[val] || 0, color: meta.colors[val] || '#999' }))
+    .filter(r => r.cnt > 0);
+  if (activeLayer !== 'type') rowsData.sort((a, b) => b.cnt - a.cnt);
+  const rows = rowsData
     .map(r =>
       '<div class="legend-row"><span class="dot" style="background:' + r.color + '"></span>'
       + escapeHtml(r.val) + '<span class="legend-count">' + r.cnt.toLocaleString('vi-VN') + '</span></div>'
@@ -1264,6 +1277,13 @@ document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
 document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebar);
 // Bấm chọn 1 điểm trên bản đồ (di động) -> tự đóng thanh bên để xem toàn màn hình
 map.on('click', () => { if (window.innerWidth <= 900) closeSidebar(); });
+
+// Zoom thay đổi -> chỉ cập nhật lại BÁN KÍNH của các điểm đang có sẵn (rẻ hơn nhiều so với vẽ lại
+// toàn bộ điểm từ đầu qua buildMarkers()).
+map.on('zoomend', () => {
+  const r = radiusForZoom_(map.getZoom());
+  markers.forEach(m => m.setRadius(r));
+});
 </script>
 </body>
 </html>
