@@ -715,10 +715,10 @@ async function fetchDetail(id) {
 // zoom gần tới mức thấy rõ tên đường mới phóng lớn hơn — nhưng tối đa cũng chỉ bằng 1/2 kích thước
 // cũ (5.5px) để không còn tình trạng điểm quá to lấn át chi tiết bản đồ như trước.
 function radiusForZoom_(zoom) {
-  if (zoom >= 16) return 5.4; // +50% so với 3.6
-  if (zoom >= 14) return 4.05;
-  if (zoom >= 12) return 3.15;
-  return 2.4; // +50% so với 1.6
+  if (zoom >= 16) return 3.96; // +10% so với mức gốc 3.6
+  if (zoom >= 14) return 2.97;
+  if (zoom >= 12) return 2.31;
+  return 1.76; // +10% so với mức gốc 1.6
 }
 
 function buildMarkers(){
@@ -867,10 +867,10 @@ function escapeHtml(s){
 // thật của từng cơ sở khi người dùng bấm nút tương ứng trên bản đồ.
 // ============================================================================
 const REPORT_FORM_TEMPLATES = {
-  nguoidan: "https://docs.google.com/forms/d/e/1FAIpQLSd8WGoAYZGxXRRIelVQT1T1jZBwAP6RvQ-AiDAa14geQpMz_A/viewform?usp=pp_url&entry.1600122109=__MA__&entry.631227406=__TEN__&entry.471128513=__DIACHI__",
-  chucoso: "https://docs.google.com/forms/d/e/1FAIpQLSd2_EfFSEO98mYS5kxQ7ogij0CwZWzCoZuRfPQyo0Rhb49L9Q/viewform?usp=pp_url&entry.1428457285=__MA__&entry.1426976931=__TEN__&entry.169169703=__DIACHI__",
-  canbo: "https://docs.google.com/forms/d/e/1FAIpQLSfcd_A9KBvVdBuWDQUy6VDvGIYdgFh49wBgBezPK84BlKSo4g/viewform?usp=pp_url&entry.56615684=__MA__&entry.1482818291=__TEN__&entry.817055363=__DIACHI__",
-  toado: "https://docs.google.com/forms/d/e/1FAIpQLSeg8BrRlZYa9D2TS6XkcGteEM1_c6BuqWuYEFmmZcly7jL9OQ/viewform?usp=pp_url&entry.668598238=__MA__&entry.571953292=__TEN__&entry.1963374808=__DIACHI__",
+  nguoidan:  "CHUA_CAU_HINH__DAN_URL_MAU_NGUOI_DAN_VAO_DAY",
+  chucoso:   "CHUA_CAU_HINH__DAN_URL_MAU_CHU_CO_SO_VAO_DAY",
+  canbo:     "CHUA_CAU_HINH__DAN_URL_MAU_CAN_BO_PX_VAO_DAY",
+  toado:     "CHUA_CAU_HINH__DAN_URL_MAU_CAP_NHAT_TOA_DO_VAO_DAY",
 };
 
 function buildReportUrl(role, d) {
