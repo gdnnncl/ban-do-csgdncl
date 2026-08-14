@@ -190,7 +190,7 @@
 
   /* Tăng độ tương phản cho nền bản đồ để tên đường/địa danh rõ hơn — CHỈ áp dụng cho lớp nền (tile),
      không ảnh hưởng tới các điểm hay popup vì Leaflet vẽ chúng ở lớp riêng biệt. */
-  .leaflet-tile-pane{ filter: contrast(1.2) brightness(0.9); }
+  .leaflet-tile-pane{ filter: contrast(1.56) brightness(0.9); }
 
   .leaflet-popup-content-wrapper{border-radius:8px;}
 
@@ -715,10 +715,10 @@ async function fetchDetail(id) {
 // zoom gần tới mức thấy rõ tên đường mới phóng lớn hơn — nhưng tối đa cũng chỉ bằng 1/2 kích thước
 // cũ (5.5px) để không còn tình trạng điểm quá to lấn át chi tiết bản đồ như trước.
 function radiusForZoom_(zoom) {
-  if (zoom >= 16) return 3.6; // đã thấy rõ tên đường -> to hơn 1 chút so với trước theo yêu cầu
-  if (zoom >= 14) return 2.7;
-  if (zoom >= 12) return 2.1;
-  return 1.6; // zoom xa, nhìn toàn thành phố -> vẫn giữ nhỏ nhất, ưu tiên nhìn rõ đường sá
+  if (zoom >= 16) return 5.4; // +50% so với 3.6
+  if (zoom >= 14) return 4.05;
+  if (zoom >= 12) return 3.15;
+  return 2.4; // +50% so với 1.6
 }
 
 function buildMarkers(){
