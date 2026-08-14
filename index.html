@@ -190,7 +190,10 @@
 
   /* Tăng độ tương phản cho nền bản đồ để tên đường/địa danh rõ hơn — CHỈ áp dụng cho lớp nền (tile),
      không ảnh hưởng tới các điểm hay popup vì Leaflet vẽ chúng ở lớp riêng biệt. */
-  .leaflet-tile-pane{ filter: contrast(1.56) brightness(0.9); }
+  /* Chỉ dùng brightness() giảm đều — contrast() đã bị bỏ vì nó kéo phần sáng (đường) sáng THÊM trong
+     lúc kéo phần tối (chữ) tối thêm, khiến đường gần như biến mất vào nền trắng. brightness() làm tối
+     đồng đều cả 2, không đẩy phần nào về phía biến mất. */
+  .leaflet-tile-pane{ filter: brightness(0.78); }
 
   .leaflet-popup-content-wrapper{border-radius:8px;}
 
