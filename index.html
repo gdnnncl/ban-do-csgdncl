@@ -208,15 +208,14 @@
      đồng đều cả 2, không đẩy phần nào về phía biến mất. */
   .leaflet-tile-pane{ filter: brightness(1.0); }
 
-  /* Đổi con trỏ chuột khi trỏ vào các điểm trên bản đồ: mặc định Leaflet dùng hình bàn tay (pointer),
-     che khuất điểm và không có tâm rõ ràng -> khó nhắm chính xác vào các điểm nhỏ. Dấu cộng (crosshair)
-     có tâm chính giữa rõ ràng, dễ canh trúng điểm nhỏ hơn nhiều. */
-  .leaflet-interactive{ cursor: crosshair !important; }
+  /* Con trỏ chuột khi trỏ vào các điểm trên bản đồ: dùng mũi tên chuẩn của hệ điều hành (default) —
+     không dùng hình bàn tay mặc định của Leaflet (che khuất điểm nhỏ) hay dấu cộng (đã thử trước đó). */
+  .leaflet-interactive{ cursor: default !important; }
 
   .leaflet-popup-content-wrapper{border-radius:8px;}
 
   .marker-tooltip.leaflet-tooltip{
-    background:rgba(255,255,255,0.7) !important;
+    background:rgba(255,255,255,0.42) !important;
     backdrop-filter:blur(3px);
     -webkit-backdrop-filter:blur(3px);
     color:#1E4D8C !important;
@@ -228,7 +227,7 @@
     box-shadow:0 2px 6px rgba(0,0,0,0.15);
   }
   .marker-tooltip.leaflet-tooltip-right:before{
-    border-right-color:rgba(255,255,255,0.7) !important;
+    border-right-color:rgba(255,255,255,0.42) !important;
   }
   .popup h3{margin:0 0 6px 0;font-size:13.5px;line-height:1.3;}
   .popup .row{font-size:12px;margin:3px 0;color:#333;}
@@ -792,7 +791,7 @@ function buildMarkers(){
     // Khác với popup (bấm vào mới hiện, cần tải thêm địa chỉ/SĐT/Website riêng).
     marker.bindTooltip(escapeHtml(d.name), {
       direction: 'right',
-      offset: [8, 8],
+      offset: [8, 18],
       opacity: 0.95,
       className: 'marker-tooltip',
     });
@@ -1323,6 +1322,12 @@ const DATA_SOURCE_URL = "https://script.google.com/macros/s/AKfycbw9xZDdpSuov5Ma
 async function loadLiveDataThenInit() {
   const statusNote = document.getElementById('missingNote');
   const configured = DATA_SOURCE_URL && DATA_SOURCE_URL.indexOf("CHUA_CAU_HINH") !== 0;
+
+  // Tranh thủ tải TRƯỚC danh sách cơ sở chưa có tọa độ ngay từ lúc này, CHẠY SONG SONG với dữ liệu
+  // chính (không dùng "await" ở đây để không làm chậm việc hiện bản đồ) — mục đích: khi người dùng
+  // gõ vào ô tìm kiếm LẦN ĐẦU TIÊN, danh sách này (thường) đã tải xong sẵn trong lúc họ nhìn bản đồ,
+  // không còn phải chờ thêm 1 lượt gọi máy chủ mới ngay lúc gõ tìm kiếm nữa.
+  loadMissingCoordListIfNeeded();
 
   if (configured) {
     statusNote.textContent = '⏳ Đang tải dữ liệu mới nhất từ Google Sheets... (có thể mất vài giây)';
