@@ -169,7 +169,8 @@
   }
   .search-result-item:last-child{border-bottom:none;}
   .search-result-item:hover{background:#F0F2F1;}
-  .search-result-item .sr-name{flex:1;}
+  .search-result-item .sr-name{flex:1;color:#3B82C4;font-weight:600;}
+  .search-result-item:hover .sr-name{color:#2563AA;}
   .search-result-item .sr-badge{
     font-size:10px;font-weight:600;color:#9C6500;background:#FFF3CD;
     padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0;
@@ -206,6 +207,11 @@
      lúc kéo phần tối (chữ) tối thêm, khiến đường gần như biến mất vào nền trắng. brightness() làm tối
      đồng đều cả 2, không đẩy phần nào về phía biến mất. */
   .leaflet-tile-pane{ filter: brightness(1.0); }
+
+  /* Đổi con trỏ chuột khi trỏ vào các điểm trên bản đồ: mặc định Leaflet dùng hình bàn tay (pointer),
+     che khuất điểm và không có tâm rõ ràng -> khó nhắm chính xác vào các điểm nhỏ. Dấu cộng (crosshair)
+     có tâm chính giữa rõ ràng, dễ canh trúng điểm nhỏ hơn nhiều. */
+  .leaflet-interactive{ cursor: crosshair !important; }
 
   .leaflet-popup-content-wrapper{border-radius:8px;}
 
@@ -518,7 +524,10 @@ const CONF_ORDER = ["Cao","Trung bình","Thấp"];
 function distinctSorted(field){
   const counts = {};
   DATA.forEach(d => {
-    const v = (d[field] || '').trim() || 'Chưa phân loại';
+    // .replace(/\s+/g,' ') chuẩn hóa khoảng trắng THỪA Ở GIỮA chuỗi (không chỉ đầu/cuối như .trim())
+    // — sửa lỗi 1 phường/xã bị tách thành 2 mục khác nhau trong danh sách chỉ vì dư 1 khoảng trắng
+    // đâu đó giữa tên (rất hay gặp khi dữ liệu được gõ tay hoặc copy từ nhiều nguồn khác nhau).
+    const v = (d[field] || '').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
     counts[v] = (counts[v] || 0) + 1;
   });
   const keys = Object.keys(counts);
@@ -748,8 +757,11 @@ function buildMarkers(){
   const tallies = {};
 
   DATA.forEach(d => {
-    const typeVal = (d.type || '').trim() || 'Chưa phân loại';
-    const wardVal = (d.ward || '').trim() || 'Chưa phân loại';
+    // PHẢI chuẩn hóa khoảng trắng giống HỆT cách distinctSorted() làm ở trên, nếu không 2 nơi sẽ tính
+    // ra 2 giá trị khác nhau cho cùng 1 phường/xã có khoảng trắng thừa -> bộ lọc hiển thị đúng nhưng
+    // không khớp được với điểm thực tế trên bản đồ (điểm biến mất dù checkbox đang bật).
+    const typeVal = (d.type || '').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
+    const wardVal = (d.ward || '').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
     if (!activeStatus.has(d.status) || !activeConf.has(d.confidence)) return;
     if (!activeType.has(typeVal) || !activeWard.has(wardVal)) return;
     if (searchTerm && normalize(d.name).indexOf(searchTerm) === -1) return;
