@@ -163,6 +163,18 @@
   .missing-coord-item .mc-name{font-weight:600;font-size:12px;}
   .missing-coord-item .mc-address{font-size:11px;color:var(--muted);margin:2px 0 6px;}
 
+  .search-result-item{
+    padding:8px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12.5px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .search-result-item:last-child{border-bottom:none;}
+  .search-result-item:hover{background:#F0F2F1;}
+  .search-result-item .sr-name{flex:1;}
+  .search-result-item .sr-badge{
+    font-size:10px;font-weight:600;color:#9C6500;background:#FFF3CD;
+    padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0;
+  }
+
   .legend-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:10px;background:#F0F2F1;border-radius:6px;margin-top:6px;}
 
   #mapWrap{flex:1;position:relative;}
@@ -193,7 +205,7 @@
   /* Chỉ dùng brightness() giảm đều — contrast() đã bị bỏ vì nó kéo phần sáng (đường) sáng THÊM trong
      lúc kéo phần tối (chữ) tối thêm, khiến đường gần như biến mất vào nền trắng. brightness() làm tối
      đồng đều cả 2, không đẩy phần nào về phía biến mất. */
-  .leaflet-tile-pane{ filter: brightness(0.975); }
+  .leaflet-tile-pane{ filter: brightness(1.0); }
 
   .leaflet-popup-content-wrapper{border-radius:8px;}
 
@@ -379,6 +391,7 @@
       </div>
 
       <input type="text" id="search" placeholder="Đang tải dữ liệu..." disabled>
+      <div id="searchResults" class="scroll-filter" style="display:none;margin-bottom:16px;"></div>
 
       <div class="filter-group">
         <div class="layer-header">
@@ -510,6 +523,7 @@ function distinctSorted(field){
   });
   const keys = Object.keys(counts);
   if (field === 'type') return sortByTypeGroup(keys);
+  if (field === 'ward') return keys.sort((a, b) => a.localeCompare(b, 'vi'));
   return keys.sort((a,b) => counts[b] - counts[a]);
 }
 
@@ -644,6 +658,7 @@ const activeType = new Set(TYPE_ORDER);
 const activeWard = new Set(WARD_ORDER);
 let searchTerm = "";
 let markers = [];
+let markersById = {}; // id -> marker Leaflet, dùng để mở đúng điểm khi bấm vào kết quả tìm kiếm
 
 function normalize(s){ return (s||'').toString().toLowerCase(); }
 
@@ -718,15 +733,16 @@ async function fetchDetail(id) {
 // zoom gần tới mức thấy rõ tên đường mới phóng lớn hơn — nhưng tối đa cũng chỉ bằng 1/2 kích thước
 // cũ (5.5px) để không còn tình trạng điểm quá to lấn át chi tiết bản đồ như trước.
 function radiusForZoom_(zoom) {
-  if (zoom >= 16) return 3.96; // +10% so với mức gốc 3.6
-  if (zoom >= 14) return 2.97;
-  if (zoom >= 12) return 2.31;
-  return 1.76; // +10% so với mức gốc 1.6
+  // Trước đây điểm nhỏ dần khi thu nhỏ bản đồ (để nhìn rõ đường), nhưng gây khó trỏ chuột/chạm vào
+  // điểm ở mức zoom xa -> đổi lại dùng ĐỒNG NHẤT kích thước lớn nhất (như lúc phóng to hết cỡ) ở
+  // MỌI mức zoom, ưu tiên dễ chọn điểm hơn là nhìn rõ đường lúc zoom xa.
+  return 3.96;
 }
 
 function buildMarkers(){
   markers.forEach(m => map.removeLayer(m));
   markers = [];
+  markersById = {};
   let shown = 0;
   const activeLayer = getActiveColorLayer();
   const tallies = {};
@@ -806,6 +822,7 @@ function buildMarkers(){
 
     marker.addTo(map);
     markers.push(marker);
+    markersById[d.id] = marker;
     shown++;
   });
   const shownCountEl = document.getElementById('shownCount');
@@ -1026,9 +1043,78 @@ function wireStaticControls(){
   });
 }
 
-document.getElementById('search').addEventListener('input', e => {
+/** Xếp hạng mức khớp của 1 tên với từ khóa tìm kiếm — ưu tiên khớp phần ĐUÔI tên trước, vì tên cơ sở
+ *  thường bắt đầu bằng loại hình chung chung ("Trung tâm", "Trường", "Công ty..."), nếu chỉ so khớp
+ *  từ trái sang phải sẽ dễ khớp nhầm hàng loạt cơ sở khác loại hình nhưng cùng từ mở đầu. Khớp phần
+ *  đuôi (thường là tên riêng/thương hiệu) mới thực sự giúp tìm đúng cơ sở người dùng đang nghĩ tới.
+ *  Trả về: 2 = khớp đúng phần đuôi tên, 1 = khớp ở đâu đó trong tên, 0 = không khớp. */
+function searchMatchTier_(name, term) {
+  const n = normalize(name);
+  if (!term) return 0;
+  if (n.endsWith(term)) return 2;
+  if (n.indexOf(term) !== -1) return 1;
+  return 0;
+}
+
+function renderSearchResults_(term) {
+  const box = document.getElementById('searchResults');
+  if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  const withCoord = [];
+  DATA.forEach(d => {
+    const tier = searchMatchTier_(d.name, term);
+    if (tier > 0) withCoord.push({ id: d.id, name: d.name, tier: tier, hasCoord: true });
+  });
+  const withoutCoord = [];
+  (missingCoordList || []).forEach(r => {
+    const tier = searchMatchTier_(r.name, term);
+    if (tier > 0) withoutCoord.push({ id: r.id, name: r.name, address: r.address, tier: tier, hasCoord: false, raw: r });
+  });
+
+  const all = withCoord.concat(withoutCoord)
+    .sort((a, b) => (b.tier - a.tier) || a.name.localeCompare(b.name, 'vi'))
+    .slice(0, 30);
+
+  box.style.display = '';
+  if (all.length === 0) {
+    box.innerHTML = '<div class="legend-note" style="margin:0">Không tìm thấy cơ sở nào khớp.</div>';
+    return;
+  }
+
+  box.innerHTML = all.map((r, i) =>
+    '<div class="search-result-item" data-idx="' + i + '">'
+    + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
+    + (r.hasCoord ? '' : '<span class="sr-badge">📍 Chưa có tọa độ</span>')
+    + '</div>'
+  ).join('');
+
+  box.querySelectorAll('.search-result-item').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      const r = all[i];
+      if (r.hasCoord) {
+        // Đã có tọa độ -> đưa bản đồ tới đúng điểm, mở popup của điểm đó
+        const marker = markersById[r.id];
+        if (marker) {
+          map.setView(marker.getLatLng(), Math.max(map.getZoom(), 17));
+          marker.openPopup();
+        }
+      } else {
+        // Chưa có tọa độ -> không có gì để "đưa bản đồ tới" -> dẫn thẳng tới Form cập nhật tọa độ
+        const link = buildReportUrl('toado', r.raw);
+        if (link !== '#') window.open(link, '_blank', 'noopener');
+      }
+      box.style.display = 'none';
+    });
+  });
+}
+
+document.getElementById('search').addEventListener('input', async e => {
   searchTerm = normalize(e.target.value);
-  buildMarkers();
+  buildMarkers(); // vẫn lọc trực tiếp các điểm trên bản đồ như trước (giữ hành vi hữu ích cũ)
+
+  // Đảm bảo đã có danh sách cơ sở CHƯA CÓ tọa độ để gộp vào kết quả gợi ý (tải lười, chỉ 1 lần)
+  await loadMissingCoordListIfNeeded();
+  renderSearchResults_(searchTerm);
 });
 
 // ---- Header stats ----
