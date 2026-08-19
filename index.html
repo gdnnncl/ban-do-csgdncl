@@ -175,6 +175,7 @@
     font-size:10px;font-weight:600;color:#9C6500;background:#FFF3CD;
     padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0;
   }
+  .search-result-item .sr-badge-hidden{color:#9C0006;background:#FFDCDC;}
 
   .legend-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:10px;background:#F0F2F1;border-radius:6px;margin-top:6px;}
 
@@ -1080,7 +1081,10 @@ function renderSearchResults_(term) {
   const withCoord = [];
   DATA.forEach(d => {
     const tier = searchMatchTier_(d.name, term);
-    if (tier > 0) withCoord.push({ id: d.id, name: d.name, tier: tier, hasCoord: true });
+    if (tier > 0) withCoord.push({
+      id: d.id, name: d.name, tier: tier, hasCoord: true,
+      type: d.type, status: d.status, ward: d.ward, confidence: d.confidence,
+    });
   });
   const withoutCoord = [];
   (missingCoordList || []).forEach(r => {
@@ -1098,18 +1102,32 @@ function renderSearchResults_(term) {
     return;
   }
 
-  box.innerHTML = all.map((r, i) =>
-    '<div class="search-result-item" data-idx="' + i + '">'
-    + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
-    + (r.hasCoord ? '' : '<span class="sr-badge">📍 Chưa có tọa độ</span>')
-    + '</div>'
-  ).join('');
+  box.innerHTML = all.map((r, i) => {
+    const hidden = r.hasCoord && isHiddenByFilters_(r);
+    return '<div class="search-result-item" data-idx="' + i + '">'
+      + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
+      + (r.hasCoord
+          ? (hidden ? '<span class="sr-badge sr-badge-hidden">🚫 Đang bị ẩn bởi bộ lọc</span>' : '')
+          : '<span class="sr-badge">📍 Chưa có tọa độ</span>')
+      + '</div>';
+  }).join('');
 
   box.querySelectorAll('.search-result-item').forEach((el, i) => {
     el.addEventListener('click', () => {
       const r = all[i];
       if (r.hasCoord) {
-        // Đã có tọa độ -> đưa bản đồ tới đúng điểm, mở popup của điểm đó
+        // Nếu cơ sở này đang bị 1 trong các bộ lọc (Loại hình/Phường-Xã/Trạng thái/Độ tin cậy) ẩn đi,
+        // TỰ ĐỘNG bật lại đúng các mục cần thiết trước — nếu không, bấm vào sẽ "không có phản ứng gì"
+        // vì chưa từng có điểm nào được vẽ cho cơ sở đó (rất hay gặp với cơ sở "Giải thể"/"Hết hạn",
+        // vốn bị ẩn theo mặc định).
+        if (isHiddenByFilters_(r)) {
+          activeType.add(r.type || 'Chưa phân loại');
+          activeWard.add(r.ward || 'Chưa phân loại');
+          activeStatus.add(r.status || 'Chưa xác định');
+          activeConf.add(r.confidence || "Chưa xác định");
+          renderFilterLists(); // vẽ lại checkbox cho khớp trạng thái mới bật
+          buildMarkers();
+        }
         const marker = markersById[r.id];
         if (marker) {
           map.setView(marker.getLatLng(), Math.max(map.getZoom(), 17));
@@ -1123,6 +1141,17 @@ function renderSearchResults_(term) {
       box.style.display = 'none';
     });
   });
+}
+
+/** Kiểm tra 1 cơ sở (đã có tọa độ) có đang bị ẨN bởi bộ lọc hiện tại không — ví dụ trạng thái
+ *  "Giải thể"/"Ngưng hoạt động"/"Hết hạn" bị ẩn THEO MẶC ĐỊNH (xem DEFAULT_HIDDEN_STATUS), hoặc do
+ *  người dùng tự tay bỏ chọn 1 mục nào đó. */
+function isHiddenByFilters_(r) {
+  const type = r.type || 'Chưa phân loại';
+  const ward = r.ward || 'Chưa phân loại';
+  const status = r.status || 'Chưa xác định';
+  const confidence = r.confidence || 'Chưa xác định';
+  return !activeType.has(type) || !activeWard.has(ward) || !activeStatus.has(status) || !activeConf.has(confidence);
 }
 
 document.getElementById('search').addEventListener('input', async e => {
