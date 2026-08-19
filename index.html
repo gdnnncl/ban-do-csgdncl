@@ -175,7 +175,7 @@
     font-size:10px;font-weight:600;color:#9C6500;background:#FFF3CD;
     padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0;
   }
-  .search-result-item .sr-badge-hidden{color:#9C0006;background:#FFDCDC;}
+  .search-result-item .sr-badge-hidden{color:#9C0006;background:#FFDCDC;white-space:normal;text-align:right;}
 
   .legend-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:10px;background:#F0F2F1;border-radius:6px;margin-top:6px;}
 
@@ -1103,11 +1103,11 @@ function renderSearchResults_(term) {
   }
 
   box.innerHTML = all.map((r, i) => {
-    const hidden = r.hasCoord && isHiddenByFilters_(r);
+    const reason = r.hasCoord ? hiddenReason_(r) : null;
     return '<div class="search-result-item" data-idx="' + i + '">'
       + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
       + (r.hasCoord
-          ? (hidden ? '<span class="sr-badge sr-badge-hidden">🚫 Đang bị ẩn bởi bộ lọc</span>' : '')
+          ? (reason ? '<span class="sr-badge sr-badge-hidden">🚫 ' + escapeHtml(reason) + ' - Đang bị ẩn bởi bộ lọc</span>' : '')
           : '<span class="sr-badge">📍 Chưa có tọa độ</span>')
       + '</div>';
   }).join('');
@@ -1146,12 +1146,23 @@ function renderSearchResults_(term) {
 /** Kiểm tra 1 cơ sở (đã có tọa độ) có đang bị ẨN bởi bộ lọc hiện tại không — ví dụ trạng thái
  *  "Giải thể"/"Ngưng hoạt động"/"Hết hạn" bị ẩn THEO MẶC ĐỊNH (xem DEFAULT_HIDDEN_STATUS), hoặc do
  *  người dùng tự tay bỏ chọn 1 mục nào đó. */
-function isHiddenByFilters_(r) {
+/** Kiểm tra 1 cơ sở (đã có tọa độ) có đang bị ẨN bởi bộ lọc hiện tại không, và vì sao — trả về chuỗi
+ *  lý do cụ thể (vd "Giải thể") để hiện lên nhãn cảnh báo, hoặc null nếu không bị ẩn gì cả. Trạng thái
+ *  bị kiểm tra trước tiên vì đây là nguyên nhân THƯỜNG GẶP NHẤT (3 trạng thái Giải thể/Ngưng hoạt
+ *  động/Hết hạn bị ẩn THEO MẶC ĐỊNH — xem DEFAULT_HIDDEN_STATUS). */
+function hiddenReason_(r) {
   const type = r.type || 'Chưa phân loại';
   const ward = r.ward || 'Chưa phân loại';
   const status = r.status || 'Chưa xác định';
   const confidence = r.confidence || 'Chưa xác định';
-  return !activeType.has(type) || !activeWard.has(ward) || !activeStatus.has(status) || !activeConf.has(confidence);
+  if (!activeStatus.has(status)) return status; // vd "Giải thể" — đúng nguyên nhân thực tế của cơ sở này
+  if (!activeType.has(type)) return 'Loại hình "' + type + '"';
+  if (!activeWard.has(ward)) return 'Phường/Xã "' + ward + '"';
+  if (!activeConf.has(confidence)) return 'Độ tin cậy "' + confidence + '"';
+  return null;
+}
+function isHiddenByFilters_(r) {
+  return hiddenReason_(r) !== null;
 }
 
 document.getElementById('search').addEventListener('input', async e => {
