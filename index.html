@@ -174,8 +174,17 @@
   .search-result-item .sr-badge{
     font-size:10px;font-weight:600;color:#9C6500;background:#FFF3CD;
     padding:2px 6px;border-radius:10px;white-space:nowrap;flex-shrink:0;
+    cursor:pointer;
   }
+  .search-result-item .sr-badge:hover{filter:brightness(0.95);text-decoration:underline;}
   .search-result-item .sr-badge-hidden{color:#9C0006;background:#FFDCDC;white-space:normal;text-align:right;}
+
+  /* Khi cơ sở có tọa độ NGOÀI phạm vi TP.HCM: chia đúng 1/2-1/2 diện tích giữa tên và nhãn cảnh báo */
+  .search-result-item-split{align-items:flex-start;}
+  .search-result-item-split .sr-name-half{flex:0 0 50%;max-width:50%;}
+  .search-result-item-split .sr-badge-half{
+    flex:0 0 calc(50% - 6px);max-width:calc(50% - 6px);white-space:normal;text-align:center;
+  }
 
   .legend-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:10px;background:#F0F2F1;border-radius:6px;margin-top:6px;}
 
@@ -913,14 +922,13 @@ const REPORT_FORM_TEMPLATES = {
   canbo: "https://docs.google.com/forms/d/e/1FAIpQLSfcd_A9KBvVdBuWDQUy6VDvGIYdgFh49wBgBezPK84BlKSo4g/viewform?usp=pp_url&entry.56615684=__MA__&entry.1482818291=__TEN__&entry.817055363=__DIACHI__",
   toado: "https://docs.google.com/forms/d/e/1FAIpQLSeg8BrRlZYa9D2TS6XkcGteEM1_c6BuqWuYEFmmZcly7jL9OQ/viewform?usp=pp_url&entry.668598238=__MA__&entry.571953292=__TEN__&entry.1963374808=__DIACHI__",
 };
-
 function buildReportUrl(role, d) {
   const tpl = REPORT_FORM_TEMPLATES[role];
   if (!tpl || tpl.indexOf("CHUA_CAU_HINH") === 0) return "#";
   return tpl
-    .replace("__MA__", encodeURIComponent(d.id))
-    .replace("__TEN__", encodeURIComponent(d.name))
-    .replace("__DIACHI__", encodeURIComponent(d.address));
+    .replace("__MA__", encodeURIComponent(d.id || ''))
+    .replace("__TEN__", encodeURIComponent(d.name || ''))
+    .replace("__DIACHI__", encodeURIComponent(d.address || ''));
 }
 
 /** Sinh HTML cho 1 nút phản ánh. Nếu URL mẫu CHƯA được cấu hình, bấm vào sẽ hiện cảnh báo rõ ràng
@@ -1093,6 +1101,8 @@ function renderSearchResults_(term) {
       ward: (d.ward || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại',
       status: (d.status || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định',
       confidence: (d.confidence || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định',
+      outOfBounds: !isValidHcmCoord_(d.lat, d.lng),
+      lat: d.lat, lng: d.lng,
     });
   });
   const withoutCoord = [];
@@ -1112,14 +1122,41 @@ function renderSearchResults_(term) {
   }
 
   box.innerHTML = all.map((r, i) => {
-    const reason = r.hasCoord ? hiddenReason_(r) : null;
+    if (!r.hasCoord) {
+      return '<div class="search-result-item" data-idx="' + i + '">'
+        + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
+        + '<span class="sr-badge" data-action="toado" data-idx="' + i + '">📍 Chưa có tọa độ</span>'
+        + '</div>';
+    }
+    if (r.outOfBounds) {
+      // Tọa độ SAI (ngoài phạm vi TP.HCM) — chia đôi diện tích tên/nhãn theo đúng yêu cầu, nhãn là 1
+      // link RIÊNG dẫn thẳng tới Form cập nhật tọa độ (không phụ thuộc vào việc bấm vào phần tên).
+      return '<div class="search-result-item search-result-item-split" data-idx="' + i + '">'
+        + '<span class="sr-name sr-name-half">' + escapeHtml(r.name) + '</span>'
+        + '<span class="sr-badge sr-badge-hidden sr-badge-half" data-action="toado" data-idx="' + i + '">'
+        + '🚫 Tọa độ nằm ngoài bản đồ TP.HCM</span>'
+        + '</div>';
+    }
+    const reason = hiddenReason_(r);
     return '<div class="search-result-item" data-idx="' + i + '">'
       + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
-      + (r.hasCoord
-          ? (reason ? '<span class="sr-badge sr-badge-hidden">🚫 ' + escapeHtml(reason) + ' - Đang bị ẩn bởi bộ lọc</span>' : '')
-          : '<span class="sr-badge">📍 Chưa có tọa độ</span>')
+      + (reason ? '<span class="sr-badge sr-badge-hidden">🚫 ' + escapeHtml(reason) + ' - Đang bị ẩn bởi bộ lọc</span>' : '')
       + '</div>';
   }).join('');
+
+  // Bấm vào NHÃN ĐỎ "chưa có tọa độ" / "tọa độ ngoài phạm vi" -> dẫn THẲNG tới Form cập nhật tọa độ,
+  // KHÔNG đụng tới hành vi bấm vào phần tên (xử lý riêng ở dưới) — dùng stopPropagation để 2 sự kiện
+  // không dẫm lên nhau khi nhãn nằm lồng trong cùng 1 dòng kết quả.
+  box.querySelectorAll('[data-action="toado"]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = all[Number(el.dataset.idx)];
+      const payload = r.hasCoord ? { id: r.id, name: r.name, address: '' } : r.raw;
+      const link = buildReportUrl('toado', payload);
+      if (link !== '#') window.open(link, '_blank', 'noopener');
+      box.style.display = 'none';
+    });
+  });
 
   box.querySelectorAll('.search-result-item').forEach((el, i) => {
     el.addEventListener('click', () => {
@@ -1129,7 +1166,7 @@ function renderSearchResults_(term) {
         // TỰ ĐỘNG bật lại đúng các mục cần thiết trước — nếu không, bấm vào sẽ "không có phản ứng gì"
         // vì chưa từng có điểm nào được vẽ cho cơ sở đó (rất hay gặp với cơ sở "Giải thể"/"Hết hạn",
         // vốn bị ẩn theo mặc định).
-        if (isHiddenByFilters_(r)) {
+        if (!r.outOfBounds && isHiddenByFilters_(r)) {
           activeType.add(r.type || 'Chưa phân loại');
           activeWard.add(r.ward || 'Chưa phân loại');
           activeStatus.add(r.status || 'Chưa xác định');
@@ -1142,11 +1179,9 @@ function renderSearchResults_(term) {
           map.setView(marker.getLatLng(), Math.max(map.getZoom(), 17));
           marker.openPopup();
         }
-      } else {
-        // Chưa có tọa độ -> không có gì để "đưa bản đồ tới" -> dẫn thẳng tới Form cập nhật tọa độ
-        const link = buildReportUrl('toado', r.raw);
-        if (link !== '#') window.open(link, '_blank', 'noopener');
       }
+      // Trường hợp KHÔNG có tọa độ: đã xử lý riêng qua nhãn [data-action="toado"] ở trên, không cần
+      // làm gì thêm ở đây khi bấm vào phần còn lại của dòng (phần tên không có hành động tương ứng).
       box.style.display = 'none';
     });
   });
@@ -1159,6 +1194,14 @@ function renderSearchResults_(term) {
  *  lý do cụ thể (vd "Giải thể") để hiện lên nhãn cảnh báo, hoặc null nếu không bị ẩn gì cả. Trạng thái
  *  bị kiểm tra trước tiên vì đây là nguyên nhân THƯỜNG GẶP NHẤT (3 trạng thái Giải thể/Ngưng hoạt
  *  động/Hết hạn bị ẩn THEO MẶC ĐỊNH — xem DEFAULT_HIDDEN_STATUS). */
+// Phạm vi tọa độ hợp lý cho TP.HCM sau sáp nhập — ĐỒNG BỘ với HCM_LAT_MIN/MAX/LNG_MIN/MAX trong
+// Code.gs (isValidHcmCoord_) — nếu sửa 1 bên, PHẢI sửa luôn bên còn lại để không bị lệch tiêu chuẩn.
+const HCM_LAT_MIN_ = 9.3, HCM_LAT_MAX_ = 11.6, HCM_LNG_MIN_ = 105.8, HCM_LNG_MAX_ = 107.6;
+function isValidHcmCoord_(lat, lng) {
+  const la = Number(lat), ln = Number(lng);
+  return !isNaN(la) && !isNaN(ln) && la >= HCM_LAT_MIN_ && la <= HCM_LAT_MAX_ && ln >= HCM_LNG_MIN_ && ln <= HCM_LNG_MAX_;
+}
+
 function hiddenReason_(r) {
   const type = r.type || 'Chưa phân loại';
   const ward = r.ward || 'Chưa phân loại';
