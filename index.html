@@ -768,14 +768,17 @@ function buildMarkers(){
     // không khớp được với điểm thực tế trên bản đồ (điểm biến mất dù checkbox đang bật).
     const typeVal = (d.type || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
     const wardVal = (d.ward || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
-    if (!activeStatus.has(d.status) || !activeConf.has(d.confidence)) return;
+    const statusVal = (d.status || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định';
+    const confVal = (d.confidence || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định';
+    if (!activeStatus.has(statusVal) || !activeConf.has(confVal)) return;
     if (!activeType.has(typeVal) || !activeWard.has(wardVal)) return;
     if (searchTerm && normalize(d.name).indexOf(searchTerm) === -1) return;
 
     let color = '#8A8F8C'; // màu trung tính khi không có lớp nào đang bật
     if (activeLayer) {
       const meta = LAYER_META[activeLayer];
-      const val = meta.field === 'type' ? typeVal : (meta.field === 'ward' ? wardVal : d[meta.field]);
+      const val = meta.field === 'type' ? typeVal : (meta.field === 'ward' ? wardVal
+        : (meta.field === 'status' ? statusVal : (meta.field === 'confidence' ? confVal : d[meta.field])));
       color = meta.colors[val] || '#8A8F8C';
       tallies[val] = (tallies[val] || 0) + 1;
     }
@@ -1083,7 +1086,13 @@ function renderSearchResults_(term) {
     const tier = searchMatchTier_(d.name, term);
     if (tier > 0) withCoord.push({
       id: d.id, name: d.name, tier: tier, hasCoord: true,
-      type: d.type, status: d.status, ward: d.ward, confidence: d.confidence,
+      // PHẢI chuẩn hóa giống HỆT cách buildMarkers() làm khi quyết định có vẽ điểm hay không — nếu
+      // không, nhãn cảnh báo "bị ẩn bởi bộ lọc" có thể báo SAI (nói bị ẩn dù thực ra vẫn hiển thị
+      // bình thường) chỉ vì lệch nhau ở khoảng trắng thừa hoặc cách mã hóa Unicode dấu tiếng Việt.
+      type: (d.type || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại',
+      ward: (d.ward || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại',
+      status: (d.status || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định',
+      confidence: (d.confidence || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định',
     });
   });
   const withoutCoord = [];
