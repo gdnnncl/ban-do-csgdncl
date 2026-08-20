@@ -1093,6 +1093,14 @@ function searchMatchTier_(name, term) {
   return 0;
 }
 
+// Phạm vi tọa độ hợp lý cho TP.HCM sau sáp nhập — ĐỒNG BỘ với HCM_LAT_MIN/MAX/LNG_MIN/MAX trong
+// Code.gs (isValidHcmCoord_) — nếu sửa 1 bên, PHẢI sửa luôn bên còn lại để không bị lệch tiêu chuẩn.
+const HCM_LAT_MIN_ = 9.3, HCM_LAT_MAX_ = 11.6, HCM_LNG_MIN_ = 105.8, HCM_LNG_MAX_ = 107.6;
+function isValidHcmCoord_(lat, lng) {
+  const la = Number(lat), ln = Number(lng);
+  return !isNaN(la) && !isNaN(ln) && la >= HCM_LAT_MIN_ && la <= HCM_LAT_MAX_ && ln >= HCM_LNG_MIN_ && ln <= HCM_LNG_MAX_;
+}
+
 function renderSearchResults_(term) {
   const box = document.getElementById('searchResults');
   if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
