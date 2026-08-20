@@ -688,6 +688,22 @@ function normalize(s){ return (s||'').toString().toLowerCase(); }
 
 /** Bộ nhớ đệm trong phiên làm việc — nếu bấm lại đúng 1 điểm đã xem, không cần gọi lại máy chủ */
 const detailCache = {};
+// Theo dõi các Mã trung tâm ĐANG có 1 lượt tải chi tiết dở dang (chưa xong) — vì "rê chuột" (mouseover)
+// và "vừa chạm/bấm" (mousedown) đều có thể cùng kích hoạt tải trước gần như đồng thời (thao tác bình
+// thường: rê chuột rồi bấm ngay) — nếu không theo dõi, cả 2 sự kiện có thể GỌI TRÙNG 2 lượt tải cho
+// cùng 1 cơ sở trước khi lượt đầu kịp hoàn thành và ghi vào detailCache.
+const detailFetchInFlight = {};
+async function fetchDetailDedup_(id) {
+  if (detailCache[id]) return detailCache[id];
+  if (detailFetchInFlight[id]) return detailFetchInFlight[id]; // đã có 1 lượt đang tải -> dùng chung, không gọi thêm
+  const p = fetchDetail(id).then(function (detail) {
+    if (detail) detailCache[id] = detail;
+    delete detailFetchInFlight[id];
+    return detail;
+  });
+  detailFetchInFlight[id] = p;
+  return p;
+}
 
 /** Sinh HTML popup theo 2 giai đoạn:
  *  - detail = null: chỉ hiện các trường KHÔNG nhạy cảm đã có sẵn (tên, loại, trạng thái...), kèm
@@ -820,22 +836,14 @@ function buildMarkers(){
     // liên hệ hàng loạt. Trên điện thoại/máy tính bảng không có khái niệm "rê chuột" nên không áp
     // dụng được tối ưu này — chạm vào vẫn tải như bình thường lúc bấm.
     marker.on('mouseover', function () {
-      if (!detailCache[d.id]) {
-        fetchDetail(d.id).then(function (detail) {
-          if (detail) detailCache[d.id] = detail;
-        });
-      }
+      fetchDetailDedup_(d.id);
     });
     // 'mousedown' cũng tương ứng với lúc NGÓN TAY VỪA CHẠM XUỐNG trên điện thoại/tablet (Leaflet tự
     // quy đổi sự kiện chạm về cùng hệ sự kiện chuột) — tranh thủ khoảng thời gian rất ngắn giữa lúc
     // chạm và lúc bấm hoàn tất để tải sớm, giúp cả người dùng di động cũng được hưởng lợi phần nào
     // từ cơ chế tải trước này, không chỉ riêng máy tính có chuột.
     marker.on('mousedown', function () {
-      if (!detailCache[d.id]) {
-        fetchDetail(d.id).then(function (detail) {
-          if (detail) detailCache[d.id] = detail;
-        });
-      }
+      fetchDetailDedup_(d.id);
     });
 
     // Chỉ gọi tải thông tin chi tiết (địa chỉ/SĐT/Website/Place ID) khi người dùng THỰC SỰ bấm vào
@@ -845,8 +853,7 @@ function buildMarkers(){
         marker.setPopupContent(buildPopupHtml(d, detailCache[d.id]));
         return;
       }
-      const detail = await fetchDetail(d.id);
-      if (detail) detailCache[d.id] = detail;
+      const detail = await fetchDetailDedup_(d.id);
       marker.setPopupContent(buildPopupHtml(d, detail || {}));
     });
 
@@ -922,6 +929,7 @@ const REPORT_FORM_TEMPLATES = {
   canbo: "https://docs.google.com/forms/d/e/1FAIpQLSfcd_A9KBvVdBuWDQUy6VDvGIYdgFh49wBgBezPK84BlKSo4g/viewform?usp=pp_url&entry.56615684=__MA__&entry.1482818291=__TEN__&entry.817055363=__DIACHI__",
   toado: "https://docs.google.com/forms/d/e/1FAIpQLSeg8BrRlZYa9D2TS6XkcGteEM1_c6BuqWuYEFmmZcly7jL9OQ/viewform?usp=pp_url&entry.668598238=__MA__&entry.571953292=__TEN__&entry.1963374808=__DIACHI__",
 };
+
 function buildReportUrl(role, d) {
   const tpl = REPORT_FORM_TEMPLATES[role];
   if (!tpl || tpl.indexOf("CHUA_CAU_HINH") === 0) return "#";
@@ -1089,20 +1097,21 @@ function renderSearchResults_(term) {
   const box = document.getElementById('searchResults');
   if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
 
+  // CHỈ hiện cơ sở khớp với các bộ lọc (Loại hình/Phường-Xã/Trạng thái/Độ tin cậy) ĐANG BẬT — không
+  // còn hiện kèm cơ sở bị ẩn bởi bộ lọc như trước, để danh sách gợi ý luôn khớp đúng với những gì
+  // đang thực sự hiển thị được trên bản đồ.
   const withCoord = [];
   DATA.forEach(d => {
     const tier = searchMatchTier_(d.name, term);
-    if (tier > 0) withCoord.push({
+    if (tier === 0) return;
+    const type = (d.type || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
+    const ward = (d.ward || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại';
+    const status = (d.status || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định';
+    const confidence = (d.confidence || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định';
+    if (!activeType.has(type) || !activeWard.has(ward) || !activeStatus.has(status) || !activeConf.has(confidence)) return;
+    withCoord.push({
       id: d.id, name: d.name, tier: tier, hasCoord: true,
-      // PHẢI chuẩn hóa giống HỆT cách buildMarkers() làm khi quyết định có vẽ điểm hay không — nếu
-      // không, nhãn cảnh báo "bị ẩn bởi bộ lọc" có thể báo SAI (nói bị ẩn dù thực ra vẫn hiển thị
-      // bình thường) chỉ vì lệch nhau ở khoảng trắng thừa hoặc cách mã hóa Unicode dấu tiếng Việt.
-      type: (d.type || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại',
-      ward: (d.ward || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa phân loại',
-      status: (d.status || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định',
-      confidence: (d.confidence || '').normalize('NFC').replace(/\s+/g, ' ').trim() || 'Chưa xác định',
       outOfBounds: !isValidHcmCoord_(d.lat, d.lng),
-      lat: d.lat, lng: d.lng,
     });
   });
   const withoutCoord = [];
@@ -1117,7 +1126,7 @@ function renderSearchResults_(term) {
 
   box.style.display = '';
   if (all.length === 0) {
-    box.innerHTML = '<div class="legend-note" style="margin:0">Không tìm thấy cơ sở nào khớp.</div>';
+    box.innerHTML = '<div class="legend-note" style="margin:0">Không tìm thấy cơ sở nào khớp (trong phạm vi bộ lọc đang bật).</div>';
     return;
   }
 
@@ -1129,24 +1138,18 @@ function renderSearchResults_(term) {
         + '</div>';
     }
     if (r.outOfBounds) {
-      // Tọa độ SAI (ngoài phạm vi TP.HCM) — chia đôi diện tích tên/nhãn theo đúng yêu cầu, nhãn là 1
-      // link RIÊNG dẫn thẳng tới Form cập nhật tọa độ (không phụ thuộc vào việc bấm vào phần tên).
       return '<div class="search-result-item search-result-item-split" data-idx="' + i + '">'
         + '<span class="sr-name sr-name-half">' + escapeHtml(r.name) + '</span>'
         + '<span class="sr-badge sr-badge-hidden sr-badge-half" data-action="toado" data-idx="' + i + '">'
         + '🚫 Tọa độ nằm ngoài bản đồ TP.HCM</span>'
         + '</div>';
     }
-    const reason = hiddenReason_(r);
     return '<div class="search-result-item" data-idx="' + i + '">'
       + '<span class="sr-name">' + escapeHtml(r.name) + '</span>'
-      + (reason ? '<span class="sr-badge sr-badge-hidden">🚫 ' + escapeHtml(reason) + ' - Đang bị ẩn bởi bộ lọc</span>' : '')
       + '</div>';
   }).join('');
 
-  // Bấm vào NHÃN ĐỎ "chưa có tọa độ" / "tọa độ ngoài phạm vi" -> dẫn THẲNG tới Form cập nhật tọa độ,
-  // KHÔNG đụng tới hành vi bấm vào phần tên (xử lý riêng ở dưới) — dùng stopPropagation để 2 sự kiện
-  // không dẫm lên nhau khi nhãn nằm lồng trong cùng 1 dòng kết quả.
+  // Bấm vào NHÃN ĐỎ "chưa có tọa độ" / "tọa độ ngoài phạm vi" -> dẫn THẲNG tới Form cập nhật tọa độ.
   box.querySelectorAll('[data-action="toado"]').forEach(el => {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1162,59 +1165,15 @@ function renderSearchResults_(term) {
     el.addEventListener('click', () => {
       const r = all[i];
       if (r.hasCoord) {
-        // Nếu cơ sở này đang bị 1 trong các bộ lọc (Loại hình/Phường-Xã/Trạng thái/Độ tin cậy) ẩn đi,
-        // TỰ ĐỘNG bật lại đúng các mục cần thiết trước — nếu không, bấm vào sẽ "không có phản ứng gì"
-        // vì chưa từng có điểm nào được vẽ cho cơ sở đó (rất hay gặp với cơ sở "Giải thể"/"Hết hạn",
-        // vốn bị ẩn theo mặc định).
-        if (!r.outOfBounds && isHiddenByFilters_(r)) {
-          activeType.add(r.type || 'Chưa phân loại');
-          activeWard.add(r.ward || 'Chưa phân loại');
-          activeStatus.add(r.status || 'Chưa xác định');
-          activeConf.add(r.confidence || "Chưa xác định");
-          renderFilterLists(); // vẽ lại checkbox cho khớp trạng thái mới bật
-          buildMarkers();
-        }
         const marker = markersById[r.id];
         if (marker) {
           map.setView(marker.getLatLng(), Math.max(map.getZoom(), 17));
           marker.openPopup();
         }
       }
-      // Trường hợp KHÔNG có tọa độ: đã xử lý riêng qua nhãn [data-action="toado"] ở trên, không cần
-      // làm gì thêm ở đây khi bấm vào phần còn lại của dòng (phần tên không có hành động tương ứng).
       box.style.display = 'none';
     });
   });
-}
-
-/** Kiểm tra 1 cơ sở (đã có tọa độ) có đang bị ẨN bởi bộ lọc hiện tại không — ví dụ trạng thái
- *  "Giải thể"/"Ngưng hoạt động"/"Hết hạn" bị ẩn THEO MẶC ĐỊNH (xem DEFAULT_HIDDEN_STATUS), hoặc do
- *  người dùng tự tay bỏ chọn 1 mục nào đó. */
-/** Kiểm tra 1 cơ sở (đã có tọa độ) có đang bị ẨN bởi bộ lọc hiện tại không, và vì sao — trả về chuỗi
- *  lý do cụ thể (vd "Giải thể") để hiện lên nhãn cảnh báo, hoặc null nếu không bị ẩn gì cả. Trạng thái
- *  bị kiểm tra trước tiên vì đây là nguyên nhân THƯỜNG GẶP NHẤT (3 trạng thái Giải thể/Ngưng hoạt
- *  động/Hết hạn bị ẩn THEO MẶC ĐỊNH — xem DEFAULT_HIDDEN_STATUS). */
-// Phạm vi tọa độ hợp lý cho TP.HCM sau sáp nhập — ĐỒNG BỘ với HCM_LAT_MIN/MAX/LNG_MIN/MAX trong
-// Code.gs (isValidHcmCoord_) — nếu sửa 1 bên, PHẢI sửa luôn bên còn lại để không bị lệch tiêu chuẩn.
-const HCM_LAT_MIN_ = 9.3, HCM_LAT_MAX_ = 11.6, HCM_LNG_MIN_ = 105.8, HCM_LNG_MAX_ = 107.6;
-function isValidHcmCoord_(lat, lng) {
-  const la = Number(lat), ln = Number(lng);
-  return !isNaN(la) && !isNaN(ln) && la >= HCM_LAT_MIN_ && la <= HCM_LAT_MAX_ && ln >= HCM_LNG_MIN_ && ln <= HCM_LNG_MAX_;
-}
-
-function hiddenReason_(r) {
-  const type = r.type || 'Chưa phân loại';
-  const ward = r.ward || 'Chưa phân loại';
-  const status = r.status || 'Chưa xác định';
-  const confidence = r.confidence || 'Chưa xác định';
-  if (!activeStatus.has(status)) return status; // vd "Giải thể" — đúng nguyên nhân thực tế của cơ sở này
-  if (!activeType.has(type)) return 'Loại hình "' + type + '"';
-  if (!activeWard.has(ward)) return 'Phường/Xã "' + ward + '"';
-  if (!activeConf.has(confidence)) return 'Độ tin cậy "' + confidence + '"';
-  return null;
-}
-function isHiddenByFilters_(r) {
-  return hiddenReason_(r) !== null;
 }
 
 document.getElementById('search').addEventListener('input', async e => {
