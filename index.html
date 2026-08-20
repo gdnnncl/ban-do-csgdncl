@@ -705,6 +705,21 @@ async function fetchDetailDedup_(id) {
   return p;
 }
 
+/** Tải chi tiết (nếu chưa có sẵn trong cache) rồi cập nhật popup của marker — dùng CHUNG cho cả 2 nơi:
+ *  (1) người dùng bấm TRỰC TIẾP vào điểm trên bản đồ (Leaflet tự phát sinh sự kiện 'click' thật),
+ *  (2) người dùng bấm vào 1 kết quả trong danh sách gợi ý tìm kiếm rồi gọi marker.openPopup() BẰNG
+ *  CODE — trường hợp (2) KHÔNG tự kích hoạt sự kiện 'click' thật của Leaflet, nên nếu không gọi hàm
+ *  này rõ ràng ở cả 2 nơi, popup mở từ danh sách gợi ý sẽ mãi kẹt ở trạng thái "Đang tải..." vì việc
+ *  tải chi tiết không bao giờ được kích hoạt (đây chính là lỗi thật đã xảy ra trước khi tách hàm này). */
+async function openMarkerAndLoadDetail_(marker, d) {
+  if (detailCache[d.id]) {
+    marker.setPopupContent(buildPopupHtml(d, detailCache[d.id]));
+    return;
+  }
+  const detail = await fetchDetailDedup_(d.id);
+  marker.setPopupContent(buildPopupHtml(d, detail || {}));
+}
+
 /** Sinh HTML popup theo 2 giai đoạn:
  *  - detail = null: chỉ hiện các trường KHÔNG nhạy cảm đã có sẵn (tên, loại, trạng thái...), kèm
  *    dòng "Đang tải..." — dùng ngay lúc marker vừa được tạo, KHÔNG gọi máy chủ.
@@ -849,12 +864,7 @@ function buildMarkers(){
     // Chỉ gọi tải thông tin chi tiết (địa chỉ/SĐT/Website/Place ID) khi người dùng THỰC SỰ bấm vào
     // đúng điểm này — không tải sẵn cho toàn bộ 1 lúc, tránh lộ thông tin liên hệ hàng loạt.
     marker.on('click', async function () {
-      if (detailCache[d.id]) {
-        marker.setPopupContent(buildPopupHtml(d, detailCache[d.id]));
-        return;
-      }
-      const detail = await fetchDetailDedup_(d.id);
-      marker.setPopupContent(buildPopupHtml(d, detail || {}));
+      await openMarkerAndLoadDetail_(marker, d);
     });
 
     marker.addTo(map);
@@ -1180,13 +1190,17 @@ function renderSearchResults_(term) {
   });
 
   box.querySelectorAll('.search-result-item').forEach((el, i) => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', async () => {
       const r = all[i];
       if (r.hasCoord) {
         const marker = markersById[r.id];
         if (marker) {
           map.setView(marker.getLatLng(), Math.max(map.getZoom(), 17));
           marker.openPopup();
+          // openPopup() bằng code KHÔNG tự kích hoạt tải chi tiết (khác với bấm trực tiếp trên bản đồ)
+          // -> phải tự gọi rõ ràng ở đây, dùng đúng hàm dùng chung để tránh lặp logic.
+          const d = DATA.find(x => x.id === r.id);
+          if (d) await openMarkerAndLoadDetail_(marker, d);
         }
       }
       box.style.display = 'none';
