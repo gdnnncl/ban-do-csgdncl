@@ -1120,6 +1120,7 @@ function renderSearchResults_(term) {
     withCoord.push({
       id: d.id, name: d.name, tier: tier, hasCoord: true,
       outOfBounds: !isValidHcmCoord_(d.lat, d.lng),
+      isClosedStatus: DEFAULT_HIDDEN_STATUS.includes(status), // Giải thể/Ngưng hoạt động/Hết hạn
     });
   });
   const withoutCoord = [];
@@ -1128,8 +1129,17 @@ function renderSearchResults_(term) {
     if (tier > 0) withoutCoord.push({ id: r.id, name: r.name, address: r.address, tier: tier, hasCoord: false, raw: r });
   });
 
+  // Thứ tự nhóm ưu tiên: (0) có tọa độ & đang hoạt động bình thường -> (1) chưa có tọa độ -> (2) có
+  // tọa độ nhưng đã Giải thể/Ngưng hoạt động/Hết hạn (chỉ xuất hiện khi các checkbox này đang được
+  // bật thủ công, vì mặc định 3 trạng thái này đã bị lọc ẩn từ bước trên).
+  function resultGroup_(r) {
+    if (!r.hasCoord) return 1;
+    if (r.isClosedStatus) return 2;
+    return 0;
+  }
+
   const all = withCoord.concat(withoutCoord)
-    .sort((a, b) => (b.tier - a.tier) || a.name.localeCompare(b.name, 'vi'))
+    .sort((a, b) => (resultGroup_(a) - resultGroup_(b)) || (b.tier - a.tier) || a.name.localeCompare(b.name, 'vi'))
     .slice(0, 30);
 
   box.style.display = '';
