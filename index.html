@@ -977,21 +977,25 @@ function countByFallback(field, value){
 }
 
 /** Vẽ danh sách checkbox không có màu cố định (dùng cho Loại trung tâm / Phường/Xã) */
+/** Tạo 1 dòng checkbox bộ lọc (dùng chung cho cả renderPlainFilter và renderTypeFilter bên dưới) —
+ *  tự thêm vào container và nối sẵn sự kiện thay đổi. */
+function appendFilterRow_(el, val, activeSet, field){
+  const row = document.createElement('label');
+  row.className = 'filter-row';
+  row.innerHTML =
+    '<input type="checkbox" ' + (activeSet.has(val) ? 'checked' : '') + '>' +
+    '<span>' + val + '</span>' +
+    '<span class="count">' + countByFallback(field, val).toLocaleString('vi-VN') + '</span>';
+  el.appendChild(row);
+  row.querySelector('input').addEventListener('change', e => {
+    if (e.target.checked) activeSet.add(val); else activeSet.delete(val);
+    buildMarkers();
+  });
+}
+
 function renderPlainFilter(containerId, order, activeSet, field){
   const el = document.getElementById(containerId);
-  order.forEach(val => {
-    const row = document.createElement('label');
-    row.className = 'filter-row';
-    row.innerHTML =
-      '<input type="checkbox" ' + (activeSet.has(val) ? 'checked' : '') + '>' +
-      '<span>' + val + '</span>' +
-      '<span class="count">' + countByFallback(field, val).toLocaleString('vi-VN') + '</span>';
-    el.appendChild(row);
-    row.querySelector('input').addEventListener('change', e => {
-      if (e.target.checked) activeSet.add(val); else activeSet.delete(val);
-      buildMarkers();
-    });
-  });
+  order.forEach(val => appendFilterRow_(el, val, activeSet, field));
 }
 
 /** Vẽ riêng bộ lọc "Loại hình đơn vị" — có chèn tiêu đề phân nhóm (Nhóm 1/2/3) xen giữa danh sách,
@@ -1008,17 +1012,7 @@ function renderTypeFilter(containerId, order, activeSet, field){
       el.appendChild(divider);
       lastGroupLabel = groupLabel;
     }
-    const row = document.createElement('label');
-    row.className = 'filter-row';
-    row.innerHTML =
-      '<input type="checkbox" ' + (activeSet.has(val) ? 'checked' : '') + '>' +
-      '<span>' + val + '</span>' +
-      '<span class="count">' + countByFallback(field, val).toLocaleString('vi-VN') + '</span>';
-    el.appendChild(row);
-    row.querySelector('input').addEventListener('change', e => {
-      if (e.target.checked) activeSet.add(val); else activeSet.delete(val);
-      buildMarkers();
-    });
+    appendFilterRow_(el, val, activeSet, field);
   });
 }
 
