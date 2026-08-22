@@ -740,8 +740,12 @@ function buildPopupHtml(d, detail) {
   if (!detail) {
     return base + '<div class="row" style="color:var(--muted)"><span class="popup-mini-spinner"></span>Đang tải địa chỉ, liên hệ...</div></div>';
   }
-  if (!detail.address && !detail.phone && !detail.website) {
-    // fetchDetail thất bại (mất mạng, chưa cấu hình DATA_SOURCE_URL...) hoặc không tìm thấy bản ghi
+  if (!detail.id) {
+    // fetchDetail() chỉ trả về null (rồi bị "|| {}" biến thành object rỗng KHÔNG có trường "id") khi
+    // THỰC SỰ lỗi (mất mạng, chưa cấu hình DATA_SOURCE_URL...) — lúc tải THÀNH CÔNG luôn có "id", dù
+    // address/phone/website có thể hợp lệ để trống (cơ sở chưa có đủ thông tin liên hệ). Trước đây
+    // kiểm tra nhầm theo address/phone/website rỗng, khiến các cơ sở CHƯA CÓ đủ thông tin liên hệ (dù
+    // tải hoàn toàn thành công) bị báo nhầm là "lỗi tải".
     return base + '<div class="row" style="color:#C0392B">⚠️ Không tải được thông tin chi tiết. Thử bấm lại.</div></div>';
   }
 
@@ -749,7 +753,7 @@ function buildPopupHtml(d, detail) {
   const merged = Object.assign({}, d, detail); // gộp để reportButtonHtml có đủ address cho link prefill
 
   return base +
-    '<div class="row"><b>Địa chỉ:</b> ' + escapeHtml(detail.address) + '</div>' +
+    '<div class="row"><b>Địa chỉ:</b> ' + (detail.address ? escapeHtml(detail.address) : '<span style="color:var(--muted)">Chưa có địa chỉ</span>') + '</div>' +
     (detail.phone ? '<div class="row"><b>ĐT:</b> ' + escapeHtml(detail.phone) + '</div>' : '') +
     (detail.website
       ? '<div class="row"><b>Website:</b> <a href="' + normalizeWebsiteUrl(detail.website)
